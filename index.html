@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C/S본부 대리점 서비스 모니터링</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy: #101E33;
+    --navy-soft: #16305A;
+    --orange: #E08A3C;
+    --page-bg: #F5F6F8;
+    --panel: #FFFFFF;
+    --border: #E4E6EC;
+    --text: #101828;
+    --text-sub: #667085;
+    --text-faint: #98A2B3;
+    --accent: #C0392B;
+    --accent-soft: #F8E3E1;
+    --steel: #2C5A82;
+    --steel-soft: #E4EDF4;
+    --amber: #B67B1E;
+    --amber-soft: #F6EBDA;
+    --good: #2E7D5B;
+    --track: #EEF0F3;
+    --row-hover: #F6F7F9;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    background:var(--page-bg);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* Header (다크 남색 상단 바) */
+  .app-header{background:var(--navy);padding:20px 28px;}
+  .header-inner{max-width:1260px;margin:0 auto;}
+  .app-header h1{color:#FFFFFF;font-size:19px;margin:0 0 4px;font-weight:700;letter-spacing:-0.01em;}
+  .app-header p{color:#9FB0C9;font-size:12.5px;margin:0;}
+
+  .page{max-width:1260px;margin:0 auto;padding:20px 24px 60px;}
+
+  /* Filter controls (pill button groups) */
+  .control-row{display:flex;flex-direction:column;gap:12px;margin-bottom:18px;padding:14px 16px;background:var(--panel);border:1px solid var(--border);border-radius:10px;}
+  .control-line{display:flex;gap:26px;align-items:center;flex-wrap:wrap;}
+  .control-line-2{padding-top:12px;border-top:1px solid var(--border);}
+  .control-group{display:flex;align-items:center;gap:10px;}
+  .control-label{font-size:12.5px;color:var(--text-sub);font-weight:600;white-space:nowrap;}
+  .pill-group{display:flex;gap:6px;flex-wrap:wrap;}
+  .pill-btn{
+    padding:6px 13px;font-size:12.5px;border-radius:7px;border:1px solid var(--border);
+    background:#fff;color:var(--text-sub);cursor:pointer;font-family:inherit;font-weight:500;
+  }
+  .pill-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .search-group{margin-left:auto;}
+  .search-group input{
+    padding:7px 12px;border:1px solid var(--border);border-radius:7px;font-size:12.5px;
+    min-width:200px;font-family:inherit;color:var(--text);
+  }
+  select.pill-select{
+    padding:6px 12px;font-size:12.5px;border-radius:7px;border:1px solid var(--border);
+    background:#fff;color:var(--text-sub);font-family:inherit;
+  }
+
+  /* Tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px;}
+  .tab-btn{
+    padding:10px 16px;font-size:13.5px;font-weight:600;color:var(--text-sub);
+    background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;
+    font-family:inherit;
+  }
+  .tab-btn.active{color:var(--text);border-bottom-color:var(--accent);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* KPI cards */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+  .kpi-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+  .kpi-label{font-size:12px;color:var(--text-sub);margin-bottom:10px;}
+  .kpi-value{font-size:24px;font-weight:800;letter-spacing:-0.01em;}
+  .kpi-value .unit{font-size:13px;font-weight:500;color:var(--text-sub);margin-left:2px;}
+  .kpi-value.accent{color:var(--accent);}
+  .kpi-sub{font-size:11.5px;color:var(--text-faint);margin-top:9px;}
+
+  /* Panels */
+  .grid-2{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-bottom:16px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;}
+  .panel h3{margin:0 0 3px;font-size:14.5px;font-weight:700;color:var(--text);}
+  .panel .panel-sub{margin:0 0 16px;font-size:12px;color:var(--text-faint);}
+
+  /* Type progress list (등급 분포 스타일) */
+  .type-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #F2F4F7;}
+  .type-row:last-child{border-bottom:none;}
+  .type-circle{
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;
+  }
+  .type-name{width:120px;flex-shrink:0;font-size:12.5px;color:var(--text);font-weight:600;}
+  .type-track{flex:1;height:8px;background:var(--track);border-radius:6px;overflow:hidden;}
+  .type-fill{height:100%;border-radius:6px;}
+  .type-count{width:100px;text-align:right;font-size:12.5px;color:var(--text-sub);font-variant-numeric:tabular-nums;flex-shrink:0;}
+  .type-footnote{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-faint);}
+
+  /* Tables */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;font-size:11.5px;color:var(--text-sub);font-weight:600;
+    padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
+  }
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{color:var(--text);}
+  th.sortable .sort-arrow{display:inline-block;width:10px;margin-left:3px;font-size:10px;color:var(--text-faint);}
+  th.sortable.sort-active .sort-arrow{color:var(--accent);}
+  td{padding:9px 10px;border-bottom:1px solid #F2F4F7;color:var(--text);}
+  tr:last-child td{border-bottom:none;}
+  .rank-table tr:hover td{background:var(--row-hover);}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+  .badge.misclass{background:var(--steel-soft);color:var(--steel);}
+  .badge.false{background:var(--accent-soft);color:var(--accent);}
+  .badge.image{background:var(--amber-soft);color:var(--amber);}
+  .badge.paid{background:#EFF1F5;color:var(--text-sub);}
+
+  .drill-link{color:var(--steel);cursor:pointer;text-decoration:none;font-weight:600;}
+  .drill-link:hover{text-decoration:underline;}
+  .empty-note{color:var(--text-faint);font-size:12.5px;text-align:center;padding:30px 0;}
+  .content-snippet{color:var(--text-sub);font-size:12.5px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .legend-row{display:flex;gap:16px;justify-content:center;margin-top:10px;flex-wrap:wrap;}
+  .legend-row .item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-sub);}
+  .legend-row .dot{width:9px;height:9px;border-radius:2px;}
+
+  .branch-row{display:flex;align-items:center;gap:10px;padding:7px 0;}
+  .branch-label{width:96px;flex-shrink:0;font-size:12.5px;color:var(--text);}
+  .branch-track{flex:1;background:var(--track);border-radius:5px;height:9px;overflow:hidden;}
+  .branch-fill{height:100%;border-radius:5px;background:var(--navy-soft);}
+  .branch-val{width:60px;text-align:right;font-size:12.5px;color:var(--text-sub);font-variant-numeric:tabular-nums;flex-shrink:0;}
+
+  @media (max-width:900px){
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+    .grid-2{grid-template-columns:1fr;}
+    .control-line{flex-direction:column;align-items:flex-start;}
+    .search-group{margin-left:0;width:100%;}
+    .search-group input{width:100%;}
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-inner">
+    <h1>C/S본부 대리점 서비스 모니터링</h1>
+    <p id="periodNote">부정/부실 서비스 발생 현황 종합</p>
+  </div>
+</header>
+
+<div class="page">
+
+  <div class="control-row">
+    <div class="control-line">
+      <div class="control-group">
+        <span class="control-label">지사</span>
+        <select class="pill-select" id="fBranch"><option value="all">전체 지사</option></select>
+      </div>
+      <div class="control-group">
+        <span class="control-label">대리점</span>
+        <select class="pill-select" id="fDealer"><option value="all">전체 대리점</option></select>
+      </div>
+      <div class="control-group">
+        <span class="control-label">유형</span>
+        <div class="pill-group" id="typePills"></div>
+      </div>
+      <div class="control-group search-group">
+        <input type="text" id="fSearch" placeholder="상담번호 · 대리점명 검색">
+      </div>
+    </div>
+    <div class="control-line control-line-2">
+      <div class="control-group">
+        <span class="control-label">기준월</span>
+        <div class="pill-group" id="monthPills"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="overview">종합현황</button>
+    <button class="tab-btn" data-tab="rank">지사·대리점별</button>
+    <button class="tab-btn" data-tab="type">유형별 분석</button>
+    <button class="tab-btn" data-tab="detail">상세 내역</button>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">총 발생건수</div>
+      <div class="kpi-value" id="kpiCount">-</div>
+      <div class="kpi-sub" id="kpiCountSub"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">총 발생금액 (기술료 포함)</div>
+      <div class="kpi-value accent" id="kpiAmount">-</div>
+      <div class="kpi-sub" id="kpiAmountSub"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">건당 평균 발생금액</div>
+      <div class="kpi-value" id="kpiAvg">-</div>
+      <div class="kpi-sub">전체 기간 평균</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">최다 발생 대리점</div>
+      <div class="kpi-value" id="kpiTopDealer" style="font-size:18px;">-</div>
+      <div class="kpi-sub" id="kpiTopDealerSub"></div>
+    </div>
+  </div>
+
+  <!-- 종합현황 -->
+  <div class="tab-panel active" id="tab-overview">
+    <div class="grid-2">
+      <div class="panel">
+        <h3>월별 발생 건수 추이</h3>
+        <p class="panel-sub">선택된 지사·기간 기준 합계</p>
+        <canvas id="trendChart" height="115"></canvas>
+      </div>
+      <div class="panel">
+        <h3>유형별 발생 비중</h3>
+        <p class="panel-sub">선택 기간 기준 · 중복 체크 포함</p>
+        <div id="typeList"></div>
+        <div class="type-footnote">기준 — 오계리: 등급·항목 오분류 / 허위·과다청구: 실제 처리와 다른 과다 청구 / 이미지첨부오류: 첨부사진 누락·오류</div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>월별 발생금액 추이</h3>
+        <p class="panel-sub">지사 합계 기준</p>
+        <canvas id="amountChart" height="115"></canvas>
+      </div>
+      <div class="panel">
+        <h3>지사별 발생 현황</h3>
+        <p class="panel-sub">발생 건수 기준</p>
+        <div id="branchBars"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 지사 대리점별 -->
+  <div class="tab-panel" id="tab-rank">
+    <div class="panel" id="rankBranchPanel">
+      <h3>지사별 요약</h3>
+      <p class="panel-sub">지사를 클릭하면 소속 대리점 상세로 이동합니다</p>
+      <table class="rank-table">
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th class="sortable" data-key="branch">지사<span class="sort-arrow"></span></th>
+            <th class="num sortable" data-key="dealers">발생대리점수<span class="sort-arrow"></span></th>
+            <th class="num sortable" data-key="count">발생건수<span class="sort-arrow"></span></th>
+            <th class="num sortable" data-key="amount">총 발생금액<span class="sort-arrow"></span></th>
+            <th class="num sortable" data-key="avg">건당 평균<span class="sort-arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="branchRankBody"></tbody>
+      </table>
+    </div>
+    <div class="panel" id="rankDealerPanel" style="display:none;">
+      <a class="drill-link" id="rankBackLink">← 전체 지사</a>
+      <h3 id="rankDealerTitle" style="margin-top:10px;">대리점별 랭킹</h3>
+      <p class="panel-sub">클릭하면 상세 내역으로 이동</p>
+      <table class="rank-table">
+        <thead>
+          <tr><th>순위</th><th>대리점</th><th class="num">발생건수</th><th class="num">총 발생금액</th><th class="num">건당 평균</th></tr>
+        </thead>
+        <tbody id="dealerRankBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 유형별 -->
+  <div class="tab-panel" id="tab-type">
+    <div class="grid-2">
+      <div class="panel">
+        <h3>유형별 발생 비중</h3>
+        <p class="panel-sub">선택 기간 기준</p>
+        <div id="typeListBig"></div>
+      </div>
+      <div class="panel">
+        <h3>유형 조합 현황</h3>
+        <p class="panel-sub">단일 · 중복 발생 패턴</p>
+        <div id="comboList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상세 -->
+  <div class="tab-panel" id="tab-detail">
+    <div class="panel">
+      <a class="drill-link" id="detailBackLink" style="display:none;">← 전체 보기 (지사·대리점 전체)</a>
+      <h3 style="margin-top:6px;">건별 상세 내역<span style="font-weight:400;color:var(--text-faint);font-size:12.5px;margin-left:6px;" id="detailCount"></span></h3>
+      <div style="overflow-x:auto;margin-top:10px;">
+      <table>
+        <thead>
+          <tr>
+            <th>월</th><th>상담번호</th><th>지사</th><th>대리점</th><th>유/무상</th>
+            <th class="num">발생금액</th><th>유형</th><th>부정서비스 내용</th>
+          </tr>
+        </thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+      </div>
+      <div class="empty-note" id="detailEmpty" style="display:none;">조건에 맞는 데이터가 없습니다.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const RAW = [{"month": "26.01", "counselNo": "11407441", "branch": "경남지사", "dealer": "마산대리점", "center": null, "consultant": "김경현", "paid": "유상", "repairCost": 93000.0, "amount": 5.5, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2020617S 점화봉 일체(13~17S)_기름보일러 적용 호환 불가 부품 \n  2) 원 적용부품과 차액(기술료 포함) +5.5"}, {"month": "26.01", "counselNo": "11376997", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 32000.0, "amount": 0.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2020617S 점화봉 일체(13~17S)_기름보일러 적용 호환 불가 부품 계리로 인한 \n  2) 원 적용부품과 차액(기술료 차액) +0.6"}, {"month": "26.01", "counselNo": "11361653", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 32000.0, "amount": 0.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2020617S 점화봉 일체(13~17S)_기름보일러 적용 호환 불가 부품 계리로 인한 \n  2) 원 적용부품과 차액(기술료 차액) +0.6"}, {"month": "26.01", "counselNo": "11386042", "branch": "서울남부지사", "dealer": "강서대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 61000.0, "amount": 0.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2020517S 전극봉(점화봉) _기름보일러 적용 호환 불가 부품 \n  2) 원 적용부품과 차액(기술료 포함) +0.8"}, {"month": "26.01", "counselNo": "11434946", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 159000.0, "amount": 1.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3300072S 배선일체(SG) _전기온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.6"}, {"month": "26.01", "counselNo": "11450586", "branch": "서울남부지사", "dealer": "양천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 129000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.01", "counselNo": "11415850", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 104000.0, "amount": 1.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3300072S 배선일체(SG) _전기온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.6"}, {"month": "26.01", "counselNo": "11415945", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 56000.0, "amount": 0.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2040120S 유량감지기(SWF-30) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +0.4"}, {"month": "26.01", "counselNo": "11363834", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 56000.0, "amount": 0.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2040120S 유량감지기(SWF-30) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +0.4"}, {"month": "26.01", "counselNo": "11353209", "branch": "경남지사", "dealer": "통영대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 56000.0, "amount": 0.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2040120S 유량감지기(SWF-30) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +0.4"}, {"month": "26.01", "counselNo": "11352500", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 56000.0, "amount": 0.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2040120S 유량감지기(SWF-30) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +0.4"}, {"month": "26.01", "counselNo": "11373391", "branch": "경남지사", "dealer": "마산중앙대리점", "center": null, "consultant": "김경현", "paid": "유상", "repairCost": 109000.0, "amount": 2.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3131234S 온수출탕온도센서 세트 _통합배관시스템 적용 호환 불가 부품 \n  - 해당 모델에 출탕온도 센서 적용 안됨.\n  2) 미적용 부품 차액(기술료 포함) +2.5"}, {"month": "26.01", "counselNo": "11436909", "branch": "인천지사", "dealer": "인천부평남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 225000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050161S 펌프세트(HWC 18 A/S) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11441361", "branch": "서울남부지사", "dealer": "양천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 129000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.01", "counselNo": "11439701", "branch": "서울남부지사", "dealer": "양천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 129000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.01", "counselNo": "11437124", "branch": "서울남부지사", "dealer": "양천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 129000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.01", "counselNo": "11428498", "branch": "서울남부지사", "dealer": "양천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 129000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.01", "counselNo": "11417956", "branch": "서울남부지사", "dealer": "양천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 129000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.01", "counselNo": "11364513", "branch": "부산지사", "dealer": "부산진대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 201000.0, "amount": 0.3, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2040125S 삼방모터 일체(SSP,1316,A/S)_대성보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +0.3"}, {"month": "26.01", "counselNo": "11405482", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 293000.0, "amount": 1.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) L-B010-AS1-290 온수열교환기_롯데보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.2"}, {"month": "26.01", "counselNo": "11434311", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 247000.0, "amount": 1.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) L-B010-AS1-290 온수열교환기_롯데보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.2"}, {"month": "26.01", "counselNo": "11347107", "branch": "경기지사", "dealer": "용인신갈대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 141000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11427401", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 136000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.01", "counselNo": "11400814", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 136000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.01", "counselNo": "11444708", "branch": "경기지사", "dealer": "용인중앙대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 164000.0, "amount": 0.9, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3300190S 과열방지기 (RZL, 105도)_전기온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +0.9"}, {"month": "26.01", "counselNo": "11350083", "branch": "경기지사", "dealer": "수원영통대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 132000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11397361", "branch": "서울남부지사", "dealer": "강동대리점", "center": null, "consultant": "이재규", "paid": "유상", "repairCost": 223000.0, "amount": 0.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2060333S온수열교환기 세트 (평형타입, 13핀)_가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +0.2"}, {"month": "26.01", "counselNo": "11387797", "branch": "광주지사", "dealer": "광주동구대리점", "center": null, "consultant": "고화주", "paid": "유상", "repairCost": 210000.0, "amount": 9.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 이중 계리로 인한 추가 청구 금액 발생건\n  1) 2050119S 펌프 세트 (CS-0217DSA2, A/S)_이중 계리 청구\n  2) 추가 청구 금액(기술료 포함) +9.8"}, {"month": "26.01", "counselNo": "11409989", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 200000.0, "amount": 2.9, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2066035S 입수블럭 (CHUNHUI, CHIP-08, 직수온도센서, AS)_신규하이드로블럭 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +2.9"}, {"month": "26.01", "counselNo": "11442992", "branch": "서울남부지사", "dealer": "금천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 157000.0, "amount": 1.4, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120100S 리턴고정핀 (ES, 16, 20, A/S) 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.4"}, {"month": "26.01", "counselNo": "11383061", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.01", "counselNo": "11374627", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 154000.0, "amount": 4.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3135042S 연결선일체 (DSW,A/S)_가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +4.2"}, {"month": "26.01", "counselNo": "11422710", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 135000.0, "amount": 1.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3300072S 배선일체(SG) _전기온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.6"}, {"month": "26.01", "counselNo": "11415376", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 131000.0, "amount": 1.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3300072S 배선일체(SG) _전기온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.6"}, {"month": "26.01", "counselNo": "11423728", "branch": "경기지사", "dealer": "용인신갈대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 136000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11385831", "branch": "경기지사", "dealer": "용인신갈대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 136000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11376389", "branch": "서울북부지사", "dealer": "남양주제일대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 137000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11353483", "branch": "서울북부지사", "dealer": "남양주제일대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 137000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11351674", "branch": "부산지사", "dealer": "부산서중구대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 137000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11450442", "branch": "경기지사", "dealer": "평택중부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 158000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11421029", "branch": "서울남부지사", "dealer": "하남대리점", "center": null, "consultant": "이재규", "paid": "유상", "repairCost": 158000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11397216", "branch": "서울남부지사", "dealer": "강서대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 158000.0, "amount": 3.4, "types": {"misclass": false, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11389511", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 158000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11384702", "branch": "서울남부지사", "dealer": "하남대리점", "center": null, "consultant": "이재규", "paid": "유상", "repairCost": 158000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11380828", "branch": "경기지사", "dealer": "평택대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 158000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11372857", "branch": "경기지사", "dealer": "평택중부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 158000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11359912", "branch": "경기지사", "dealer": "평택중부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 158000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11345887", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 203000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11445765", "branch": "서울남부지사", "dealer": "하남대리점", "center": null, "consultant": "이재규", "paid": "유상", "repairCost": 270000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11349811", "branch": "경기지사", "dealer": "평택대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 180000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_50,000Kcal전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11427804", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 193000.0, "amount": 1.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3300072S 배선일체(SG) _전기온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.6"}, {"month": "26.01", "counselNo": "11366945", "branch": "인천지사", "dealer": "시흥남부대리점", "center": null, "consultant": "박기완", "paid": "유상", "repairCost": 154000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11427267", "branch": "서울남부지사", "dealer": "양천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 156000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.01", "counselNo": "11349169", "branch": "대구지사", "dealer": "경주대리점", "center": null, "consultant": "임대호", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080160S 오링 (P22A, UP-34 우측. A/S)_50,000Kcal 거버너 전용 부품 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11429453", "branch": "대전지사", "dealer": "충주남부대리점", "center": null, "consultant": "황덕환", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11399556", "branch": "원주지사", "dealer": "동해남부대리점", "center": null, "consultant": "유범후", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11390426", "branch": "원주지사", "dealer": "동해남부대리점", "center": null, "consultant": "유범후", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11374577", "branch": "부산지사", "dealer": "부산연제대리점", "center": null, "consultant": "김경현", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11370438", "branch": "대전지사", "dealer": "충주대리점", "center": null, "consultant": "황덕환", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11358260", "branch": "원주지사", "dealer": "동해남부대리점", "center": null, "consultant": "유범후", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11344667", "branch": "서울남부지사", "dealer": "강남대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11343082", "branch": "원주지사", "dealer": "동해남부대리점", "center": null, "consultant": "유범후", "paid": "유상", "repairCost": 127000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11387198", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 211000.0, "amount": 6.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1)2050146S 펌프 세트 (G/F, UPS 15-62, A/S)_SHW-P 환탕 전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +6.0"}, {"month": "26.01", "counselNo": "11438831", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 248000.0, "amount": 6.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1)2050146S 펌프 세트 (G/F, UPS 15-62, A/S)_SHW-P 환탕 전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) L-B900-020-201 FAN MOTOR ASS'Y_롯데보일러 전용 부품 오계리\n  3) 미적용 부품 차액(기술료 포함) +6.0"}, {"month": "26.01", "counselNo": "11342217", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 252000.0, "amount": 6.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1)2050146S 펌프 세트 (G/F, UPS 15-62, A/S)_SHW-P 환탕 전용 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) L-B900-020-201 FAN MOTOR ASS'Y_롯데보일러 전용 부품 오계리\n  3) 미적용 부품 차액(기술료 포함) +6.0"}, {"month": "26.01", "counselNo": "11395068", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 152000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1)2050153S 펌프 세트 (K 타입, 미국, A/S)_K-type(VRP)적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11378849", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 152000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1)2050153S 펌프 세트 (K 타입, 미국, A/S)_K-type(DRP)적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11365673", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 185000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1)2050153S 펌프 세트 (K 타입, 미국, A/S)_K-type(DRP)적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11406583", "branch": "전주지사", "dealer": "김제대리점", "center": null, "consultant": "김인호", "paid": "유상", "repairCost": 133000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050161S 펌프세트(HWC 18 A/S) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.01", "counselNo": "11367822", "branch": "인천지사", "dealer": "인천부평남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 133000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050161S 펌프세트(HWC 18 A/S) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11355896", "branch": "인천지사", "dealer": "인천부평남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 133000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050161S 펌프세트(HWC 18 A/S) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11345714", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 158000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050161S 펌프세트(HWC 18 A/S) _가스온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11371324", "branch": "경남지사", "dealer": "거제대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 188000.0, "amount": 6.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2050246S 펌프(DPC, G/F UPSO15-65 CESA03, AS)_DPC 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +6.4"}, {"month": "26.01", "counselNo": "11351318", "branch": "부산지사", "dealer": "부산화명중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 152000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2052072S 펌프 세트(UP 15-62, 220V, 60Hz, DRP, A/S)_K-type(DRP)적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11341717", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 171000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2052072S 펌프 세트(UP 15-62, 220V, 60Hz, DRP, A/S)_K-type(DRP)적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.01", "counselNo": "11356291", "branch": "인천지사", "dealer": "인천중동구대리점", "center": null, "consultant": "박기완", "paid": "유상", "repairCost": 224000.0, "amount": 3.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3060255S 난방 공급관 세트 (DSH, 퇴수핀, 백업링, A/S)_통합배관 적용 호환 불가 부품 \n  - 최근 3년간(23.01~26.01) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.6"}, {"month": "26.01", "counselNo": "11390007", "branch": "경남지사", "dealer": "통영대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 148000.0, "amount": 1.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) L-B010-AS1-270 온수열교환기 ASS'Y (2-16K)_롯데보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.2"}, {"month": "26.01", "counselNo": "11423869", "branch": "대구지사", "dealer": "수성동부대리점", "center": null, "consultant": "임대호", "paid": "유상", "repairCost": 138000.0, "amount": 0.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2080364S 자동점화기 세트 (SSP N, 2530, DSC, 1335, A/S)_대성보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +0.2"}, {"month": "26.01", "counselNo": "11371898", "branch": "부산지사", "dealer": "부산진대리점", "center": null, "consultant": "이형원", "paid": "유상", "repairCost": 89000.0, "amount": 1.9, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) L-B600-010-028 신형 감압 수류스위치 ASS'Y_롯데보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.9"}, {"month": "26.01", "counselNo": "11431099", "branch": "광주지사", "dealer": "광주광산대리점", "center": null, "consultant": "박은철", "paid": "유상", "repairCost": 264000.0, "amount": 12.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 이중 계리로 인한 추가 청구 금액 발생건\n  1) 2080687S PCB일체(SSPⅡ 10~16k, 출탕, 각방, 자동)_이중 계리 청구\n  2) 추가 청구 금액(기술료 포함) +9.8"}, {"month": "26.01", "counselNo": "11413295", "branch": "서울남부지사", "dealer": "강서대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 160000.0, "amount": 0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 오계리 발생건. \n  1) 2020415S 화염감지기 세트 (K 타입, A/S)_콘덴싱 보일러 적용 호환 불가 부품"}, {"month": "26.01", "counselNo": "11410665", "branch": "경기지사", "dealer": "안산대리점", "center": null, "consultant": "박기완", "paid": "유상", "repairCost": 145000.0, "amount": 6.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 이중 계리로 인한 추가 청구 금액 발생건\n  1) 2081246S R/C일체(DR-240S,구형통신,550 A/S용)_이중 계리 청구\n  2) 추가 청구 금액(기술료 포함) +6.4\n * 이중 R/C 현장 가능성, 현장 확인 필요함."}, {"month": "26.01", "counselNo": "11427148", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 97000.0, "amount": 1.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3300072S 배선일체(SG) _전기온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.6"}, {"month": "26.01", "counselNo": "11416225", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": "주성택", "paid": "유상", "repairCost": 97000.0, "amount": 1.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3300072S 배선일체(SG) _전기온수기 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.6"}, {"month": "26.01", "counselNo": "11384088", "branch": "광주지사", "dealer": "영암판매점(형제종합설비)", "center": null, "consultant": "고화주", "paid": "유상", "repairCost": 58000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.01", "counselNo": "11395955", "branch": "광주지사", "dealer": "서귀포대리점", "center": null, "consultant": "박은철", "paid": "유상", "repairCost": 35000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080159S 가스밸브패킹 (UP-34, 좌측, A/S)오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11394459", "branch": "광주지사", "dealer": "서귀포대리점", "center": null, "consultant": "박은철", "paid": "유상", "repairCost": 44000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080159S 가스밸브패킹 (UP-34, 좌측, A/S)오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11389855", "branch": "광주지사", "dealer": "서귀포대리점", "center": null, "consultant": "박은철", "paid": "유상", "repairCost": 35000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080159S 가스밸브패킹 (UP-34, 좌측, A/S)오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11355245", "branch": "광주지사", "dealer": "서귀포대리점", "center": null, "consultant": "박은철", "paid": "유상", "repairCost": 44000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080160S 오링 (P22A, UP-34 우측. A/S)오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11344960", "branch": "광주지사", "dealer": "북광주대리점", "center": null, "consultant": "고화주", "paid": "유상", "repairCost": 35000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080160S 오링 (P22A, UP-34 우측. A/S)오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11343557", "branch": "광주지사", "dealer": "북광주대리점", "center": null, "consultant": "고화주", "paid": "유상", "repairCost": 35000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080160S 오링 (P22A, UP-34 우측. A/S)오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11387544", "branch": "전주지사", "dealer": "북남원대리점", "center": null, "consultant": "김인호", "paid": "유상", "repairCost": 41000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080160S 오링 (P22A, UP-34 우측. A/S)오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.01", "counselNo": "11439458", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 186000.0, "amount": 1.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) L-B010-AS1-290 온수열교환기_롯데보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.8"}, {"month": "26.01", "counselNo": "11435044", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": null, "consultant": "이민철", "paid": "유상", "repairCost": 212000.0, "amount": 1.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) L-B010-AS1-290 온수열교환기_롯데보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.8"}, {"month": "26.01", "counselNo": "11433460", "branch": "대구지사", "dealer": "달서남부대리점", "center": null, "consultant": "남주현", "paid": "유상", "repairCost": 152000.0, "amount": 1.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) L-B010-AS1-290 온수열교환기_롯데보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.8"}, {"month": "26.01", "counselNo": "11377474", "branch": "전주지사", "dealer": "북남원대리점", "center": null, "consultant": "김인호", "paid": "유상", "repairCost": 183000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3135032S 기름보일러 팬 모터 콘덴서(1.0㎌, 13~21k)_기름보일러 적용 호환 불가 부품 \n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.01", "counselNo": "11377325", "branch": "서울남부지사", "dealer": "금천대리점", "center": null, "consultant": "윤석현", "paid": "유상", "repairCost": 154000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11483191", "branch": "광주지사", "dealer": "영암판매점(형제종합설비)", "center": null, "consultant": null, "paid": "유상", "repairCost": 221000.0, "amount": 9.9, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2035049S 거버너일체 (DSW,A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +9.9"}, {"month": "26.02", "counselNo": "11457365", "branch": "경남지사", "dealer": "진주중앙대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 113000.0, "amount": 3.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2020415S 화염감지기 세트 (K 타입, A/S), 2020416S 스파크플러그 세트 (K 타입, A/S)_각각 중복 계리 청구 \n  2) 추가 청구 금액(기술료 포함) +3.7\n ★의견 : 기타사항에 청소 관련 4만원 청구 기입 / 금액 조정 위해 부품 추가 계리 정황."}, {"month": "26.02", "counselNo": "11504425", "branch": "원주지사", "dealer": "원주중부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 55000.0, "amount": 1.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2020424S 화염감지기 세트 (DNC, DEC, 1332, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +1.7"}, {"month": "26.02", "counselNo": "11496893", "branch": "서울북부지사", "dealer": "남양주남부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 67000.0, "amount": 3.3, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 2060396KS 응축수트랩 세트 (VRS, 199, 내수용, A/S)_추가 계리\n  2) 미적용 부품 차액(기술료 포함) +3.3"}, {"month": "26.02", "counselNo": "11452621", "branch": "경기지사", "dealer": "용인중앙대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 84000.0, "amount": 1.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2020424S 화염감지기 세트 (DNC, DEC, 1332, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +1.7"}, {"month": "26.02", "counselNo": "11461851", "branch": "대구지사", "dealer": "경산동부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 564000.0, "amount": 0, "types": {"misclass": false, "false": true, "image": false}, "content": "* 과다 청구 의심건으로 현장 확인 필요 건. \n  1) 총 10개 부품교체 / 연소실 외 주요 전장품 전체 교체 및 \\564,000원 청구.\n  2) 실제 수리 여부 현장 실사 확인 필요."}, {"month": "26.02", "counselNo": "11464062", "branch": "서울남부지사", "dealer": "금천대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 140000.0, "amount": 2.7, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3095015S버너가스켓_추가 계리\n  2) 미적용 부품 차액(기술료 포함) +2.7"}, {"month": "26.02", "counselNo": "11472802", "branch": "부산지사", "dealer": "부산진대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 181000.0, "amount": 9.9, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2030280S 가스밸브 세트 (UP23, 220V, A/S)_대성 제품 적용 부품 \n  2) 미적용 부품 차액(기술료 포함) +9.9"}, {"month": "26.02", "counselNo": "11452812", "branch": "광주지사", "dealer": "화순대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 182000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 오계리 발생건. \n 1) 2035049S 거버너일체 (DSW,A/S)_가스온수기 적용 부품\n 2) 차액 미발생 별도 교육 필요."}, {"month": "26.02", "counselNo": "11462285", "branch": "경기지사", "dealer": "용인중앙대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 138000.0, "amount": 2.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 3130346AS 온수출탕센서(ESC)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +2.5"}, {"month": "26.02", "counselNo": "11501231", "branch": "대전지사", "dealer": "당진대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 156000.0, "amount": 7.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2040118S 삼방모터 일체(ESR, 고무관, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +7.1"}, {"month": "26.02", "counselNo": "11456805", "branch": "서울북부지사", "dealer": "서울광진대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 149000.0, "amount": 7.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2040155BS 삼방모터 일체(SSP13-16)_중복 계리 청구\n  - 동일계열 부품 중복 계리.\n  2) 추가 청구 금액(기술료 포함) +7.1"}, {"month": "26.02", "counselNo": "11452288", "branch": "서울남부지사", "dealer": "동작대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 124000.0, "amount": 2.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2060245S SW+HW 블럭 세트 (ES, 1620, 출탕온도센서, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +2.7"}, {"month": "26.02", "counselNo": "11463871", "branch": "서울북부지사", "dealer": "서울성동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 267000.0, "amount": 7.6, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 및 중복 계리 \n  2) 미적용 부품 차액(기술료 포함) +7.6"}, {"month": "26.02", "counselNo": "11518088", "branch": "전주지사", "dealer": "고창중앙대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 156000.0, "amount": 7.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2040125S 삼방모터 일체(SSP, 1316, A/S)_동일 부품 중복 계리\n  2) 추가 청구 금액(기술료 포함) +7.1"}, {"month": "26.02", "counselNo": "11509860", "branch": "원주지사", "dealer": "동해남부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 186000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.02", "counselNo": "11478816", "branch": "인천지사", "dealer": "시흥남부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 163000.0, "amount": 11.0, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2040125S 삼방모터 일체(SSP, 1316, A/S), 2060288S 자동물보충 밸브일체(SSPⅡ 10~16)_\n  대성 적용 부품(해당건은 롯데보일러 제품).\n  2) 미적용 부품 차액(기술료 포함) +11.0"}, {"month": "26.02", "counselNo": "11497733", "branch": "서울남부지사", "dealer": "영등포대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 269000.0, "amount": 7.1, "types": {"misclass": true, "false": true, "image": true}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2040125S 삼방모터 일체(SSP, 1316, A/S)_동일 부품 중복 계리\n  2) 추가 청구 금액(기술료 포함) +7.1"}, {"month": "26.02", "counselNo": "11497306", "branch": "서울남부지사", "dealer": "양천대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 249000.0, "amount": 7.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2040125S 삼방모터 일체(SSP, 1316, A/S)_동일 부품 중복 계리\n  2) 추가 청구 금액(기술료 포함) +7.1"}, {"month": "26.02", "counselNo": "11496072", "branch": "서울북부지사", "dealer": "서울성동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 129000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.02", "counselNo": "11482610", "branch": "서울북부지사", "dealer": "서울성동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 129000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.02", "counselNo": "11493344", "branch": "경남지사", "dealer": "밀양대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 100000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.02", "counselNo": "11485829", "branch": "경남지사", "dealer": "통영대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 131000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11480965", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 136000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11454514", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 148000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11509729", "branch": "서울북부지사", "dealer": "서울성동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 156000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.02", "counselNo": "11498139", "branch": "서울북부지사", "dealer": "서울성동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 156000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.02", "counselNo": "11494945", "branch": "서울북부지사", "dealer": "서울성동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 156000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.02", "counselNo": "11489910", "branch": "서울북부지사", "dealer": "서울성동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 156000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.02", "counselNo": "11506521", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11492784", "branch": "서울남부지사", "dealer": "광주대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 283000.0, "amount": 7.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2040118S 삼방모터 일체(ESR, 고무관, A/S)_동일 부품 중복 계리\n  2) 추가 청구 금액(기술료 포함) +7.1"}, {"month": "26.02", "counselNo": "11470842", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 130000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11456755", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11451765", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11498046", "branch": "경기지사", "dealer": "평택중부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 178000.0, "amount": 6.0, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1)2050146S 펌프 세트 (G/F, UPS 15-62, A/S)_SHW-P 환탕 전용 적용 호환 불가 부품 \n  - 최근 3년간(23.02~26.02) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +6.0"}, {"month": "26.02", "counselNo": "11463588", "branch": "경남지사", "dealer": "김해중앙대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 152000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1)2050153S 펌프 세트 (K 타입, 미국, A/S)_K-type(VRP)적용 호환 불가 부품 \n  - 최근 3년간(23.02~26.02) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.02", "counselNo": "11496749", "branch": "인천지사", "dealer": "인천부평남부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 152000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2052072S 펌프 세트(UP 15-62, 220V, 60Hz, DRP, A/S)_K-type(DRP)적용 호환 불가 부품 \n  - 최근 3년간(23.02~26.02) 주문내역 없음.\n  2) 미적용 부품 차액(기술료 포함) +3.4"}, {"month": "26.02", "counselNo": "11453275", "branch": "인천지사", "dealer": "김포대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 148000.0, "amount": 0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 오계리 건. \n  1) L-B010-AS1-280 온수열교환기 ASS'Y (2-20K)_롯데 부품 호환 불가"}, {"month": "26.02", "counselNo": "11458448", "branch": "전주지사", "dealer": "북남원대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 66000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080160S 오링 (P22A, UP-34 우측. A/S)_50,000Kcal 거버너 전용 부품 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.02", "counselNo": "11517454", "branch": "대전지사", "dealer": "청주흥덕대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 92000.0, "amount": 3.9, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2060288S 자동물보충 밸브일체(SSPⅡ 10~16)_동일 부품 중복 계리\n  2) 추가 청구 금액(기술료 포함) +3.9"}, {"month": "26.02", "counselNo": "11468732", "branch": "전주지사", "dealer": "북남원대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 77000.0, "amount": 3.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080160S 오링 (P22A, UP-34 우측. A/S)_50,000Kcal 거버너 전용 부품 추가 중복 계리\n  2) 미적용 부품 차액(기술료 포함) +3.0"}, {"month": "26.02", "counselNo": "11503255", "branch": "서울남부지사", "dealer": "광주대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 80000.0, "amount": 3.3, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2060396KS 응축수트랩 세트 (VRS, 199, 내수용, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +3.3"}, {"month": "26.02", "counselNo": "11511942", "branch": "전주지사", "dealer": "북남원대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 65000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.01~26.01) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3080160S 오링 (P22A, UP-34 우측. A/S)_50,000Kcal 거버너 전용 부품 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.02", "counselNo": "11463819", "branch": "원주지사", "dealer": "태백중앙대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 73000.0, "amount": 2.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2081152S 자동점화기(DNC,K-TYPE,220V, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +2.8"}, {"month": "26.02", "counselNo": "11517928", "branch": "경남지사", "dealer": "울주중앙대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 161000.0, "amount": 1.3, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2082751S 전기상자 일체 (SPC, 4050, 캐스케이드)_SPC 전용 부품 호환 불가\n  2) 미적용 부품 차액(기술료 포함) +1.3"}, {"month": "26.02", "counselNo": "11480380", "branch": "부산지사", "dealer": "사천대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 252000.0, "amount": 11.9, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 2100336KS 팬 세트(K 타입, 내수용, 터보, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +11.9"}, {"month": "26.02", "counselNo": "11495669", "branch": "서울북부지사", "dealer": "서울성동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 156000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110180 오링 A/S 용 KIT(ESR,ESC)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.8"}, {"month": "26.02", "counselNo": "11453865", "branch": "전주지사", "dealer": "북전주대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 52000.0, "amount": 3.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* SET부품에 포함된 오링류 계리로 인한 차액 발생건. \n  1) 2110181S 오링 A/S 용 KIT(SR,)_오링류 추가 계리 \n  2) 미적용 부품 차액(기술료 포함) +3.2"}, {"month": "26.02", "counselNo": "11512277", "branch": "서울남부지사", "dealer": "금천대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 134000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": true}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 3120030S 펌프고정핀_대성 부품 호환 불가\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.02", "counselNo": "11504048", "branch": "서울북부지사", "dealer": "남양주제일대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 242000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.02", "counselNo": "11508558", "branch": "서울북부지사", "dealer": "남양주제일대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 224000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3120030S 펌프고정핀 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.5"}, {"month": "26.02", "counselNo": "11491072", "branch": "경남지사", "dealer": "통영대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 135000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11489588", "branch": "경남지사", "dealer": "통영대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 136000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11515476", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11483223", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.02~26.02) 주문이력 없는 부품 사용 차액 발생건.\n  1) 3135001S 펌프 리드선 추가 계리\n  2) 미적용 부품 차액(기술료 포함) +1.1"}, {"month": "26.02", "counselNo": "11457027", "branch": "인천지사", "dealer": "인천남동대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 63000.0, "amount": 1.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 3300057S 전원 스위치 (Ferroli SG, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +1.4"}, {"month": "26.02", "counselNo": "11496795", "branch": "대전지사", "dealer": "보령대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 140000.0, "amount": 2.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 3580005S 안전변(ANGEL RZL/RZB 하향식, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +2.4"}, {"month": "26.02", "counselNo": "11463321", "branch": "경기지사", "dealer": "화성대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 65000.0, "amount": 2.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 부품 중복 계리로 인한 추가 청구 금액 발생건\n  1) 3580005S 안전변(ANGEL RZL/RZB 하향식, A/S)_중복 계리 청구\n  2) 추가 청구 금액(기술료 포함) +2.4"}, {"month": "26.02", "counselNo": "11473749", "branch": "서울북부지사", "dealer": "서울서대문제일대리점", "center": null, "consultant": null, "paid": "유상", "repairCost": 186000.0, "amount": 2.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 서비스 모델에 적용되지 않는 부품 사용 차액 발생건. \n  1) 2085001S 트랜스 세트 (기름보일러 자동점화기, A/S)_기름보일러 전용 부품 오계리\n  2) 미적용 부품 차액(기술료 포함) +2.1"}, {"month": "26.03", "counselNo": "11548928", "branch": "원주지사", "dealer": "태백중앙대리점", "center": "충청센터", "consultant": "유범후", "paid": "유상", "repairCost": 174000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 적용건\n  1) L-B010-AS1-960 주열교환기 UNIT(밀폐 2-20K)_롯데 적용 부품"}, {"month": "26.03", "counselNo": "11547301", "branch": "경남지사", "dealer": "진해중앙대리점", "center": "영남센터", "consultant": "김경현", "paid": "유상", "repairCost": 130000.0, "amount": 1.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 2060322S 직수레귤레이터 (8L, A/S)_추가 계리 청구\n  2) 접수증상과 관계 없는 부품 계리\n  3) 추가 청구 차액(기술료 포함) +1.7"}, {"month": "26.03", "counselNo": "11522846", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 135000.0, "amount": 2.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030317S 가스꼭지 (1/2\")_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +2.2"}, {"month": "26.03", "counselNo": "11535468", "branch": "서울남부지사", "dealer": "여주대리점", "center": "수도권센터", "consultant": "최형우", "paid": "유상", "repairCost": 135000.0, "amount": 2.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030317S 가스꼭지 (1/2\")_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +2.2"}, {"month": "26.03", "counselNo": "11534486", "branch": "인천지사", "dealer": "인천남동대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 168000.0, "amount": 2.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030317S 가스꼭지 (1/2\")_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +2.2"}, {"month": "26.03", "counselNo": "11564438", "branch": "광주지사", "dealer": "광주서강대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 170000.0, "amount": 1.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060245S SW/HW 블럭 세트 (ES, 1620, 출탕온도센서, A/S)_중복 계리\n  2) 추가 청구 차액 +1.8"}, {"month": "26.03", "counselNo": "11521551", "branch": "부산지사", "dealer": "부산금정중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 190000.0, "amount": 8.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리 및 중복 계리로 인한 차액 발생 건\n  1) 2030292S 가스밸브 세트 (ET76SC0209, 220V, A/S)_호환 불가 부품 및 \n 해당 부품 중복 계리.\n  2) 추가 청구 차액(기술료 포함) +8.8"}, {"month": "26.03", "counselNo": "11533420", "branch": "광주지사", "dealer": "여수중앙대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 102000.0, "amount": 1.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 2060322S 직수레귤레이터 (8L, A/S)_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +1.7"}, {"month": "26.03", "counselNo": "11527661", "branch": "부산지사", "dealer": "부산금정중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 142000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 적용건\n  1) 2050010S 펌프 세트 (G/F15-62, A/S)_호환 불가 부품 계리"}, {"month": "26.03", "counselNo": "11555830", "branch": "경기지사", "dealer": "용인신갈대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 137000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3120030S 펌프 고정핀_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +1.5"}, {"month": "26.03", "counselNo": "11522442", "branch": "경기지사", "dealer": "평택중부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 132000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.03", "counselNo": "11521411", "branch": "서울북부지사", "dealer": "서울강북대리점", "center": "수도권센터", "consultant": "주성택", "paid": "유상", "repairCost": 366000.0, "amount": 9.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2050119S 펌프 세트 (CS-0217DSA2, A/S)_중복 계리\n  2) 추가 청구 차액 +9.8"}, {"month": "26.03", "counselNo": "11540031", "branch": "경남지사", "dealer": "진주중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 148000.0, "amount": 1.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 2060322S 직수레귤레이터 (8L, A/S)_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +1.7"}, {"month": "26.03", "counselNo": "11547782", "branch": "인천지사", "dealer": "인천남동대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 186000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3120030S 펌프 고정핀_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +1.5"}, {"month": "26.03", "counselNo": "11568540", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.03", "counselNo": "11523202", "branch": "인천지사", "dealer": "김포대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 158000.0, "amount": 3.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +3.0"}, {"month": "26.03", "counselNo": "11532671", "branch": "광주지사", "dealer": "신)여수남부대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 158000.0, "amount": 3.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +3.0"}, {"month": "26.03", "counselNo": "11521237", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 183000.0, "amount": 4.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +4.0"}, {"month": "26.03", "counselNo": "11543184", "branch": "대구지사", "dealer": "포항북구대리점", "center": "영남센터", "consultant": "임대호", "paid": "유상", "repairCost": 210000.0, "amount": 8.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2050128S 펌프 세트 (CS, 0215DSA, A/S)_중복 계리\n  2) 추가 청구 차액 +8.8"}, {"month": "26.03", "counselNo": "11544280", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 242000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.03", "counselNo": "11532257", "branch": "부산지사", "dealer": "부산연제대리점", "center": "영남센터", "consultant": "김경현", "paid": "유상", "repairCost": 158000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3120030S 펌프 고정핀_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +1.5"}, {"month": "26.03", "counselNo": "11529881", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.03", "counselNo": "11531232", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.03", "counselNo": "11547944", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.03", "counselNo": "11526803", "branch": "서울북부지사", "dealer": "가평대리점", "center": "수도권센터", "consultant": "주성택", "paid": "유상", "repairCost": 235000.0, "amount": 8.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2050128S 펌프 세트 (CS, 0215DSA, A/S), 3040509S 온수블럭 (ESC-S, SSP, 1320, 온수출탕)_중복 계리\n  2) 추가 청구 차액 +8.8"}, {"month": "26.03", "counselNo": "11547271", "branch": "인천지사", "dealer": "인천부평남부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 133000.0, "amount": 1.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050161S 펌프 세트 (CS-0215DSA, HWC, 18, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +1.4"}, {"month": "26.03", "counselNo": "11562063", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 223000.0, "amount": 6.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050146S 펌프 세트 (G/F, UPS 15-62, A/S)_호환 불가 부품 계리 \n  2) 추가 청구 차액(기술료 포함) +6.0"}, {"month": "26.03", "counselNo": "11565296", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 286000.0, "amount": 6.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050146S 펌프 세트 (G/F, UPS 15-62, A/S)_호환 불가 부품 계리 \n  2) 추가 청구 차액(기술료 포함) +6.0"}, {"month": "26.03", "counselNo": "11543713", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 187000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": true}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2052072S 펌프 세트 (UP 15-62, 220V, 60Hz, DRP, A/S) _호환 불가 부품 계리 \n  2) 추가 청구 차액(기술료 포함) +3.4"}, {"month": "26.03", "counselNo": "11568615", "branch": "인천지사", "dealer": "인천남동대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 315000.0, "amount": 7.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060186S 온수 열교환기 세트 (3035, 15핀, A/S)_중복 계리\n  2) 추가 청구 차액 +7.5"}, {"month": "26.03", "counselNo": "11534507", "branch": "대전지사", "dealer": "대전서구대리점", "center": "충청센터", "consultant": "장홍관", "paid": "유상", "repairCost": 191000.0, "amount": 2.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060229AS 유수감지기 세트 (A/S)_중복 계리\n  2) 추가 청구 차액 +2.0"}, {"month": "26.03", "counselNo": "11536097", "branch": "대전지사", "dealer": "청주오창대리점", "center": "충청센터", "consultant": "황덕환", "paid": "유상", "repairCost": 472000.0, "amount": 5.9, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060308S 온수 열교환기 세트 (SSP, 1316, 9핀, A/S) _중복 계리\n  2) 추가 청구 차액 +5.9"}, {"month": "26.03", "counselNo": "11546876", "branch": "전주지사", "dealer": "서익산대리점", "center": "호남센터", "consultant": "김인호", "paid": "유상", "repairCost": 43000.0, "amount": 1.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 2060322S 직수레귤레이터 (8L, A/S)_추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +1.7"}, {"month": "26.03", "counselNo": "11520661", "branch": "서울북부지사", "dealer": "포천대리점", "center": "수도권센터", "consultant": "주성택", "paid": "유상", "repairCost": 779000.0, "amount": 11.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2081164S 전기상자 일체(DRS-48)_중복 계리\n  2) 추가 청구 차액 +11.7"}, {"month": "26.03", "counselNo": "11533680", "branch": "광주지사", "dealer": "서귀포대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 264000.0, "amount": 11.3, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2081229S PCB일체(SSP13~20,DSC13~22,AC,국내)_중복 계리\n  2) 추가 청구 차액 +11.3"}, {"month": "26.03", "counselNo": "11540219", "branch": "서울북부지사", "dealer": "서울강북대리점", "center": "수도권센터", "consultant": "주성택", "paid": "유상", "repairCost": 205000.0, "amount": 2.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060288S 자동물보충 밸브일체(SSPⅡ 10~16)_중복 계리\n  2) 추가 청구 차액 +2.7"}, {"month": "26.03", "counselNo": "11529418", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 182000.0, "amount": 0.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2040120S 유량감지기일체(SWF-30)_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +0.4"}, {"month": "26.03", "counselNo": "11559772", "branch": "인천지사", "dealer": "시흥남부대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 573000.0, "amount": 2.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060288S 자동물보충 밸브일체(SSPⅡ 10~16)_중복 계리\n  2) 추가 청구 차액 +2.7"}, {"month": "26.03", "counselNo": "11561144", "branch": "광주지사", "dealer": "광주북구제일대리점", "center": "호남센터", "consultant": "고화주", "paid": "유상", "repairCost": 73000.0, "amount": 2.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2082147S 자동점화기 (DNC, MEZIC)_동일 계열 부품 중복 계리\n  2) 추가 청구 차액 +2.4"}, {"month": "26.03", "counselNo": "11563923", "branch": "대구지사", "dealer": "경산동부대리점", "center": "영남센터", "consultant": "임대호", "paid": "유상", "repairCost": 201000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 오링류(KIT Ass'y) 계리로 인한 추가 차액 발생건.\n  1) 2100180 오링류 세트 (ESR, ESC, A/S)_추가 부품 계리 \n  2) 추가 청구 차액 +3.8"}, {"month": "26.03", "counselNo": "11536324", "branch": "경기지사", "dealer": "안양중앙대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 76000.0, "amount": 1.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) L-B900-040-070 화염검지 애자 ASS'Y_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +1.2"}, {"month": "26.03", "counselNo": "11556751", "branch": "서울남부지사", "dealer": "구로대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 278000.0, "amount": 6.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2086149S RC 일체 (DCR-21B,A/S)_중복 계리\n  2) 추가 청구 차액 +6.0"}, {"month": "26.03", "counselNo": "11533939", "branch": "대전지사", "dealer": "계룡대리점", "center": "충청센터", "consultant": "장홍관", "paid": "유상", "repairCost": 98000.0, "amount": 2.3, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 3300003S 온도조절기 (SG, SEV, RZL, QQM모델, A/S) _중복 계리\n  2) 추가 청구 차액 +2.3"}, {"month": "26.03", "counselNo": "11542376", "branch": "대전지사", "dealer": "청주흥덕대리점", "center": "충청센터", "consultant": "황덕환", "paid": "유상", "repairCost": 249000.0, "amount": 5.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 3300020S P/T VALVE(LONG NECK, 림USA, SACON) _중복 계리\n  2) 추가 청구 차액 +5.2"}, {"month": "26.03", "counselNo": "11566217", "branch": "광주지사", "dealer": "영암판매점(형제종합설비)", "center": "호남센터", "consultant": "고화주", "paid": "유상", "repairCost": 111000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 3580004S 양극봉(ANGEL RZL) _중복 계리\n  2) 추가 청구 차액 +1.1"}, {"month": "26.03", "counselNo": "11562818", "branch": "대구지사", "dealer": "경산온수기판매점(한국에너지,상품점)", "center": null, "consultant": null, "paid": "유상", "repairCost": 106000.0, "amount": 0.3, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 3580006S 히터패킹 (RZL, RZB, RZF, A/S) _중복 계리\n  2) 추가 청구 차액 +0.3"}, {"month": "26.03", "counselNo": "11523015", "branch": "부산지사", "dealer": "부산금정중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 89000.0, "amount": 0.3, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2040125S 삼방모터 일체(SSP, 1316, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +0.3"}, {"month": "26.03", "counselNo": "11559222", "branch": "경기지사", "dealer": "안성중앙대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 49000.0, "amount": 1.7, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2060322S 직수레귤레이터 (8L, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +1.7"}, {"month": "26.03", "counselNo": "11523892", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 142000.0, "amount": 3.3, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030214S 리턴꼭지 세트 (3/4\", CD, 단조, 수출, A/S) _호환 불가 부품 추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +3.3"}, {"month": "26.03", "counselNo": "11524572", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 142000.0, "amount": 3.3, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030214S 리턴꼭지 세트 (3/4\", CD, 단조, 수출, A/S) _호환 불가 부품 추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +3.3"}, {"month": "26.03", "counselNo": "11534594", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 142000.0, "amount": 3.3, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030214S 리턴꼭지 세트 (3/4\", CD, 단조, 수출, A/S) _호환 불가 부품 추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +3.3"}, {"month": "26.03", "counselNo": "11537232", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 142000.0, "amount": 3.3, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030214S 리턴꼭지 세트 (3/4\", CD, 단조, 수출, A/S) _호환 불가 부품 추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +3.3"}, {"month": "26.03", "counselNo": "11539701", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 142000.0, "amount": 3.3, "types": {"misclass": true, "false": true, "image": true}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030214S 리턴꼭지 세트 (3/4\", CD, 단조, 수출, A/S) _호환 불가 부품 추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +3.3"}, {"month": "26.03", "counselNo": "11547033", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 142000.0, "amount": 3.3, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3030214S 리턴꼭지 세트 (3/4\", CD, 단조, 수출, A/S) _호환 불가 부품 추가 계리 청구\n  2) 추가 청구 차액(기술료 포함) +3.3"}, {"month": "26.03", "counselNo": "11552120", "branch": "전주지사", "dealer": "정읍중앙대리점", "center": "호남센터", "consultant": "김두석", "paid": "유상", "repairCost": 58000.0, "amount": 3.2, "types": {"misclass": true, "false": true, "image": true}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2086041S 자동점화기 일체(IPGS-230S, 23kV) A/S_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +3.2"}, {"month": "26.03", "counselNo": "11540661", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 131000.0, "amount": 4.9, "types": {"misclass": true, "false": true, "image": true}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 3130777S 13/21핀(SPC-40~50,표면온도센서)_원 적용 부품 아님 \n  2) 추가 청구 차액(기술료 포함) +4.9"}, {"month": "26.04", "counselNo": "11586701", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 88000.0, "amount": 6.8, "types": {"misclass": false, "false": true, "image": false}, "content": "* 최근 3년간(23.04~26.04) 주문이력 없는 부품 계리, 차액 발생건\n  1) 2020350S LP 열변 세트 (SHW, 26, A/S)_허위 청구.\n  2) 접수 제품 및 관계 없는 부품 계리\n  3) 추가 청구 차액(기술료 포함) +6.8"}, {"month": "26.04", "counselNo": "11597723", "branch": "서울남부지사", "dealer": "여주대리점", "center": "수도권센터", "consultant": "최형우", "paid": "유상", "repairCost": 62000.0, "amount": 4.2, "types": {"misclass": false, "false": true, "image": true}, "content": "* 최근 3년간(23.04~26.04) 주문이력 없는 부품 계리, 차액 발생건\n  1) 2020370S 누리스일체(SSP Plus LNG Φ1.45x9)_허위 청구.\n  2) 접수 제품 및 관계 없는 부품 계리\n  3) 추가 청구 차액(기술료 포함) +4.2"}, {"month": "26.04", "counselNo": "11573298", "branch": "서울남부지사", "dealer": "동작대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 98000.0, "amount": 1.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020423S 스파크플러그 세트 (DNC, DEC, 1332, A/S) _중복 계리\n  2) 추가 청구 차액 +1.7"}, {"month": "26.04", "counselNo": "11577791", "branch": "광주지사", "dealer": "여수중앙대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 114000.0, "amount": 3.3, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020424S 화염감지기 세트 (DNC, DEC, 1332, A/S)_중복(4개) 계리\n  2) 추가 청구 차액 +3.3"}, {"month": "26.04", "counselNo": "11572441", "branch": "인천지사", "dealer": "일산대리점", "center": "수도권센터", "consultant": "박경훈", "paid": "유상", "repairCost": 236000.0, "amount": 2.6, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1)2080364S 자동점화기 세트 (SSP N, 2530, DSC, 1335, A/S)_중복 계리\n  2) 추가 청구 차액 +2.6"}, {"month": "26.04", "counselNo": "11592297", "branch": "광주지사", "dealer": "광주광산대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 363000.0, "amount": 7.5, "types": {"misclass": false, "false": true, "image": true}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2070346-25S 팽창탱크 세트 (2535, A/S) _중복 계리\n  2) 추가 청구 차액 +7.5"}, {"month": "26.04", "counselNo": "11579466", "branch": "서울남부지사", "dealer": "동작대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 152000.0, "amount": 1.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020423S 스파크플러그 세트 (DNC, DEC, 1332, A/S) _중복 계리\n  2) 추가 청구 차액 +1.7"}, {"month": "26.04", "counselNo": "11585922", "branch": "대전지사", "dealer": "진천대리점", "center": "충청센터", "consultant": "황덕환", "paid": "유상", "repairCost": 56000.0, "amount": 2.4, "types": {"misclass": true, "false": false, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2040120S 유량감지기일체(SWF-30)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외)+2.4"}, {"month": "26.04", "counselNo": "11577816", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 178000.0, "amount": 8.1, "types": {"misclass": false, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2040157KS 유량조절밸브 세트 (T405-243R, K타입 내수, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액 +8.1"}, {"month": "26.04", "counselNo": "11577339", "branch": "광주지사", "dealer": "제주제일대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 266000.0, "amount": 11.4, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2040128S 차압식 물보충 밸브 세트 (SSP, ESC, DNC, 1332, CD, A/S), \n 2070346-25S 팽창탱크 세트 (2535, A/S) _중복 계리\n  2) 추가 청구 차액 +11.4"}, {"month": "26.04", "counselNo": "11595639", "branch": "부산지사", "dealer": "부산연제대리점", "center": "영남센터", "consultant": "김경현", "paid": "유상", "repairCost": 257000.0, "amount": 5.9, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2040118S 삼방모터 일체(ESR, 고무관, A/S)_중복 계리\n  2) 추가 청구 차액 +5.9"}, {"month": "26.04", "counselNo": "11595429", "branch": "인천지사", "dealer": "김포대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 158000.0, "amount": 3.2, "types": {"misclass": false, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.2"}, {"month": "26.04", "counselNo": "11590744", "branch": "인천지사", "dealer": "김포대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 158000.0, "amount": 3.2, "types": {"misclass": false, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.2"}, {"month": "26.04", "counselNo": "11573549", "branch": "전주지사", "dealer": "고창중앙대리점", "center": "호남센터", "consultant": "김두석", "paid": "유상", "repairCost": 203000.0, "amount": 4.0, "types": {"misclass": false, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +4.0"}, {"month": "26.04", "counselNo": "11574924", "branch": "부산지사", "dealer": "부산동구대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 280000.0, "amount": 3.2, "types": {"misclass": false, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050124S 펌프 세트 (CS-0128DSA, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.2"}, {"month": "26.04", "counselNo": "11572805", "branch": "대구지사", "dealer": "포항남구대리점", "center": "영남센터", "consultant": "임대호", "paid": "유상", "repairCost": 269000.0, "amount": 8.6, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2050128S 펌프 세트 (CS, 0215DSA, A/S)_중복 계리\n  2) 추가 청구 차액 +8.6"}, {"month": "26.04", "counselNo": "11576385", "branch": "서울북부지사", "dealer": "서울강북대리점", "center": "수도권센터", "consultant": "주성택", "paid": "유상", "repairCost": 420000.0, "amount": 5.9, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2040125S 삼방모터 일체(SSP, 1316, A/S)_중복 계리\n  2) 추가 청구 차액 +5.9"}, {"month": "26.04", "counselNo": "11582839", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.04", "counselNo": "11580390", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.04", "counselNo": "11577911", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 156000.0, "amount": 1.1, "types": {"misclass": true, "false": true, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.04", "counselNo": "11577670", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 178000.0, "amount": 5.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050146S 펌프 세트 (G/F, UPS 15-62, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +5.0"}, {"month": "26.04", "counselNo": "11594931", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 304000.0, "amount": 5.0, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050146S 펌프 세트 (G/F, UPS 15-62, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +5.0"}, {"month": "26.04", "counselNo": "11573940", "branch": "광주지사", "dealer": "신)여수남부대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 152000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2050153S 펌프 세트 (K 타입, 미국, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.4"}, {"month": "26.04", "counselNo": "11580005", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 152000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2052072S 펌프 세트 (UP 15-62, 220V, 60Hz, DRP, A/S) _원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.4"}, {"month": "26.04", "counselNo": "11592745", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 245000.0, "amount": 3.4, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2052072S 펌프 세트 (UP 15-62, 220V, 60Hz, DRP, A/S) _원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.4"}, {"month": "26.04", "counselNo": "11601329", "branch": "경남지사", "dealer": "통영대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 138000.0, "amount": 1.9, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2060281S 온수 열교환기 세트 (VRC, 80140, 미국, A/S)_원 적용 부품 아님 \n  2) 추가 청구 차액(원 적용 부품 가격 외) +1.9"}, {"month": "26.04", "counselNo": "11595999", "branch": "서울북부지사", "dealer": "서울마포동부대리점", "center": "수도권센터", "consultant": "박경훈", "paid": "유상", "repairCost": 211000.0, "amount": 5.2, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060776S 온수 열교환기 세트 (DNC1, 15, 8핀, A/S)_중복 계리\n  2) 추가 청구 차액 +5.2"}, {"month": "26.04", "counselNo": "11595158", "branch": "대구지사", "dealer": "경주대리점", "center": "영남센터", "consultant": "임대호", "paid": "유상", "repairCost": 155000.0, "amount": 1.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020423S 스파크플러그 세트 (DNC, DEC, 1332, A/S) _중복 계리\n  2) 추가 청구 차액 +1.7"}, {"month": "26.04", "counselNo": "11578700", "branch": "광주지사", "dealer": "장흥중앙대리점", "center": "호남센터", "consultant": "고화주", "paid": "유상", "repairCost": 325000.0, "amount": 8.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2030280S 가스밸브 세트 (UP23, 220V, A/S)_중복 계리\n  2) 추가 청구 차액 +8.7"}, {"month": "26.04", "counselNo": "11574624", "branch": "대전지사", "dealer": "대전유성북부대리점", "center": "충청센터", "consultant": "장홍관", "paid": "유상", "repairCost": 145000.0, "amount": 5.8, "types": {"misclass": false, "false": true, "image": true}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2081246S R/C일체(DR-240S,구형통신,550 A/S용)_중복 계리\n  2) 추가 청구 차액 +5.8"}, {"month": "26.04", "counselNo": "11591107", "branch": "광주지사", "dealer": "곡성기차마을길대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 238000.0, "amount": 10.0, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2085035S 전기상자일체 (통신방식, DSO&DFO-S) _중복 계리\n  2) 추가 청구 차액 +10.0"}, {"month": "26.04", "counselNo": "11585471", "branch": "경남지사", "dealer": "진주제일대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 127000.0, "amount": 4.9, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2086130S 자동점화기 (DSG-220N, 콘덴싱, 내수용, 220V, A/S),2020415S 화염감지기 세트 (K 타입, A/S), 2020416S 스파크플러그 세트 (K 타입, A/S)_중복 계리\n  2) 추가 청구 차액 +4.9"}, {"month": "26.04", "counselNo": "11572705", "branch": "대구지사", "dealer": "북구중앙대리점", "center": "영남센터", "consultant": "남주현", "paid": "유상", "repairCost": 272000.0, "amount": 11.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2086157S 컨트롤러(메인컨트롤러(PCB ASSY), DNB H, 1330K, 220V, 60Hz, 국내) _중복 계리\n  2) 보증 기간 이내 제품 유상 처리 여부 확인 필\n  3) 추가 청구 차액 +11.7"}, {"month": "26.04", "counselNo": "11603463", "branch": "경남지사", "dealer": "통영대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 136000.0, "amount": 1.1, "types": {"misclass": true, "false": false, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.04", "counselNo": "11595199", "branch": "경남지사", "dealer": "통영대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 140000.0, "amount": 1.1, "types": {"misclass": true, "false": false, "image": false}, "content": "* 최근 3년간(23.03~26.03) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.04", "counselNo": "11594072", "branch": "서울남부지사", "dealer": "여주대리점", "center": "수도권센터", "consultant": "최형우", "paid": "유상", "repairCost": 105000.0, "amount": 3.8, "types": {"misclass": false, "false": true, "image": true}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) L-B600-090-680 H07 리모콘 UNIT ASS'Y_중복 계리\n  2) 추가 청구 차액 +3.8"}, {"month": "26.05", "counselNo": "11632834", "branch": "서울남부지사", "dealer": "강남대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 169000.0, "amount": 0.9, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020308S 화염감지기 세트 (SPA GOLD, A/S)_중복 계리\n  2) 발생 차액 +0.9"}, {"month": "26.05", "counselNo": "11615108", "branch": "인천지사", "dealer": "인천서구북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 62000.0, "amount": 1.5, "types": {"misclass": true, "false": true, "image": false}, "content": "* 해당 제품에 사용되지 않는 부품 계리로 인한 차액 발생 건\n  1) 2025017S 전극봉(점화봉)_기름보일러 부품 사용\n  2) 발생 차액 +1.5"}, {"month": "26.05", "counselNo": "11609047", "branch": "대전지사", "dealer": "청주오창대리점", "center": "충청센터", "consultant": "황덕환", "paid": "유상", "repairCost": 67000.0, "amount": 1.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020423S 스파크플러그 세트 (DNC, DEC, 1332, A/S)_중복 계리\n  2) 발생 차액 +1.7"}, {"month": "26.05", "counselNo": "11624060", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 210000.0, "amount": 19.0, "types": {"misclass": false, "false": true, "image": true}, "content": "⊙ 필수! 현장 확인 필요.\n * 호환불가 부품 계리로 인한 부정서비스 발생 건\n  - 롯데 보일러 제품 → 대성 부품 사용 처리건\n  1) 2030277S 가스밸브 세트 ( UP 34~35, A/S), 2086130S 자동점화기 (DSG-220N, 콘덴싱, 내수용, 220V, A/S)\n  - 최근 3년간(23.05~26.05) 주문이력 없음\n  2) 발생 차액 +19.0"}, {"month": "26.05", "counselNo": "11627993", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 159000.0, "amount": 13.9, "types": {"misclass": false, "false": true, "image": true}, "content": "⊙ 필수! 현장 확인 필요.\n * 호환불가 부품 계리로 인한 부정서비스 발생 건\n  - 롯데 보일러 제품 → 대성 부품 사용 처리건\n  1) 2030277S 가스밸브 세트 ( UP 34~35, A/S), 2086130S 자동점화기 (DSG-220N, 콘덴싱, 내수용, 220V, A/S)\n  - 최근 3년간(23.05~26.05) 주문이력 없음\n  2) 발생 차액 +13.9"}, {"month": "26.05", "counselNo": "11620584", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 250000.0, "amount": 1.2, "types": {"misclass": false, "false": true, "image": true}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 3130379AS 온수출탕센서단자(검정색,STS)_가스온수기 부품\n  2) 발생 차액 + 1.2"}, {"month": "26.05", "counselNo": "11610068", "branch": "서울남부지사", "dealer": "관악대리점", "center": "수도권센터", "consultant": "윤석현", "paid": "유상", "repairCost": 243000.0, "amount": 5.9, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2040105S 삼방모터 일체 (ESR, 동관, A/S)_중복 계리\n  2) 발생 차액 +5.9"}, {"month": "26.05", "counselNo": "11620995", "branch": "원주지사", "dealer": "속초대리점", "center": "충청센터", "consultant": "유범후", "paid": "유상", "repairCost": 94000.0, "amount": 6.2, "types": {"misclass": false, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2040159S 직수분사밸브 일체(T405-245R, 직수분사밸브, A/S)_가스온수기 부품\n  2) 발생 차액 + 6.2"}, {"month": "26.05", "counselNo": "11631160", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 126000.0, "amount": 1.1, "types": {"misclass": false, "false": true, "image": false}, "content": "* 최근 3년간(23.05~26.05) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.05", "counselNo": "11609907", "branch": "인천지사", "dealer": "인천부평북부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 134000.0, "amount": 1.1, "types": {"misclass": false, "false": true, "image": true}, "content": "* 최근 3년간(23.05~26.05) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.05", "counselNo": "11611227", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 152000.0, "amount": 3.4, "types": {"misclass": false, "false": true, "image": false}, "content": "⊙ 필수! 현장 확인 필요.\n * 해당 제품에 사용되지 않는 부품 계리\n  1) 2052072S 펌프 세트 (UP 15-62, 220V, 60Hz, DRP, A/S)_호환 불가 부품 \n  - 최근 3년간(23.05~26.05) 주문이력 없음\n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.4"}, {"month": "26.05", "counselNo": "11614239", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 182000.0, "amount": 3.4, "types": {"misclass": false, "false": true, "image": true}, "content": "⊙ 필수! 현장 확인 필요.\n * 해당 제품에 사용되지 않는 부품 계리(롯데제품→대성부품)\n  1) 2052072S 펌프 세트 (UP 15-62, 220V, 60Hz, DRP, A/S)_호환 불가 부품 \n  - 최근 3년간(23.05~26.05) 주문이력 없음\n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.4"}, {"month": "26.05", "counselNo": "11633107", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 187000.0, "amount": 3.4, "types": {"misclass": false, "false": true, "image": false}, "content": "⊙ 필수! 현장 확인 필요.\n * 해당 제품에 사용되지 않는 부품 계리(롯데제품→대성부품)\n  1) 2052072S 펌프 세트 (UP 15-62, 220V, 60Hz, DRP, A/S)_호환 불가 부품 \n  - 최근 3년간(23.05~26.05) 주문이력 없음\n  2) 추가 청구 차액(원 적용 부품 가격 외) +3.4"}, {"month": "26.05", "counselNo": "11631955", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 126000.0, "amount": 0.8, "types": {"misclass": false, "false": true, "image": true}, "content": "* 해당 제품에 사용되지 않는 부품 계리(가스제품→기름부품 사용)\n  1) 2055010S 펌프 세트 (CS 0108DSH, DSO, DX, 내수, A/S)_호환 불가 부품 \n  - 최근 3년간(23.05~26.05) 주문이력 없음\n  2) 추가 청구 차액(원 적용 부품 가격 외) +0.8"}, {"month": "26.05", "counselNo": "11610162", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 194000.0, "amount": 5.4, "types": {"misclass": false, "false": true, "image": true}, "content": "⊙ 필수! 현장 확인 필요.\n * 해당 제품에 사용되지 않는 부품 계리(롯데제품→대성부품)\n  1) 2055013S 펌프 (DPC, G/F UPS 15-62 CESA03, 내수용, A/S)\n  - 최근 3년간(23.05~26.05) 주문이력 없음\n  2) 추가 청구 차액(원 적용 부품 가격 외) +5.4"}, {"month": "26.05", "counselNo": "11629890", "branch": "경기지사", "dealer": "광명대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 174000.0, "amount": 2.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060288S 자동물보충 밸브일체(SSPⅡ 10~16)_중복 계리\n  2) 발생 차액 +2.7"}, {"month": "26.05", "counselNo": "11609017", "branch": "부산지사", "dealer": "부산서중구대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 155000.0, "amount": 6.1, "types": {"misclass": false, "false": false, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2081019S R/C일체(DR-100, 터치형, 콘덴싱용)_중복 계리\n  2) 발생 차액 +6.1"}, {"month": "26.05", "counselNo": "11617173", "branch": "인천지사", "dealer": "인천서구남부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 101000.0, "amount": 0.7, "types": {"misclass": false, "false": false, "image": false}, "content": "* 호환불가 부품 계리(롯데보일러→대성 부품사용)\n  1) 2081239MS 온도센서 (DCW, A/S)_가스온수기 부품\n  2) 발생 차액 +0.7"}, {"month": "26.06", "counselNo": "11639423", "branch": "서울남부지사", "dealer": "여주대리점", "center": "수도권센터", "consultant": "최형우", "paid": "유상", "repairCost": 98000.0, "amount": 4.2, "types": {"misclass": false, "false": true, "image": true}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020370S 누리스일체(SSP Plus LNG Φ1.45x9)_중복 계리\n  - 접수증상 : 찬물나옴 / 증상과 관계 없는 부품 중복 계리\n  2) 발생 차액 +4.2"}, {"month": "26.06", "counselNo": "11641029", "branch": "대구지사", "dealer": "동구미대리점", "center": "영남센터", "consultant": "남주현", "paid": "유상", "repairCost": 63000.0, "amount": 2.3, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020423S 스파크플러그 세트 (DNC, DEC, 1332, A/S) _중복 계리\n  2) 발생 차액 +2.3"}, {"month": "26.06", "counselNo": "11648749", "branch": "대구지사", "dealer": "거창대리점", "center": "영남센터", "consultant": "남주현", "paid": "유상", "repairCost": 132000.0, "amount": 1.3, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2030277S 가스밸브 세트 ( UP 34~35, A/S)\n  - 최근 3년간(24.06~26.06) 주문이력 없음\n  2) 발생 차액 +1.3"}, {"month": "26.06", "counselNo": "11641161", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 132000.0, "amount": 1.3, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2030277S 가스밸브 세트 ( UP 34~35, A/S)\n  - 최근 3년간(24.06~26.06) 주문이력 없음\n  2) 발생 차액 +1.3"}, {"month": "26.06", "counselNo": "11638567", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 132000.0, "amount": 1.3, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2030277S 가스밸브 세트 ( UP 34~35, A/S)\n  - 최근 3년간(24.06~26.06) 주문이력 없음\n  2) 발생 차액 +1.3"}, {"month": "26.06", "counselNo": "11638154", "branch": "경남지사", "dealer": "김해중앙대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 205000.0, "amount": 1.3, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2030277S 가스밸브 세트 ( UP 34~35, A/S)\n  - 최근 3년간(24.06~26.06) 주문이력 없음\n  - 롯데 제품 -> 대성 부품 사용\n  2) 발생 차액 +1.3"}, {"month": "26.06", "counselNo": "11642626", "branch": "경남지사", "dealer": "진해중앙대리점", "center": "영남센터", "consultant": "김경현", "paid": "유상", "repairCost": 119000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2035049S 거버너일체 (DSW,A/S)\n  - 원 적용부품 2030280S 가스밸브 세트 (UP23, 220V, A/S)"}, {"month": "26.06", "counselNo": "11637430", "branch": "광주지사", "dealer": "순천제일대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 119000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2035049S 거버너일체 (DSW,A/S)\n  - 원 적용부품 2030280S 가스밸브 세트 (UP23, 220V, A/S)"}, {"month": "26.06", "counselNo": "11652378", "branch": "인천지사", "dealer": "인천부평남부대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 133000.0, "amount": 1.5, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2050161S 펌프 세트 (CS-0215DSA, HWC, 18, A/S)\n  - 최근 3년간(24.06~26.06) 주문이력 없음\n  2) 발생 차액 +1.5"}, {"month": "26.06", "counselNo": "11648023", "branch": "인천지사", "dealer": "김포대리점", "center": "수도권센터", "consultant": "박기완", "paid": "유상", "repairCost": 242000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060245S SW+HW 블럭 세트 (ES, 1620, 출탕온도센서, A/S)_중복 계리\n  - 2060239S RW+CW 블럭 세트 (ES, 1620, A/S) 계리 요망 \n  - 하이드로블럭 양쪽 수리라면 각 1개씩 계리 요망"}, {"month": "26.06", "counselNo": "11643849", "branch": "부산지사", "dealer": "부산사하대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 151000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060245S SW+HW 블럭 세트 (ES, 1620, 출탕온도센서, A/S)_중복 계리\n  - 2060239S RW+CW 블럭 세트 (ES, 1620, A/S) 계리 요망 \n  - 하이드로블럭 양쪽 수리라면 각 1개씩 계리 요망"}, {"month": "26.06", "counselNo": "11640755", "branch": "대구지사", "dealer": "수성북부대리점(폐점,이원조)", "center": null, "consultant": null, "paid": "유상", "repairCost": 264000.0, "amount": 11.3, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2080687S PCB일체(SSPⅡ 10~16k, 출탕, 각방, 자동) \n  2) 발생 차액 +11.3"}, {"month": "26.06", "counselNo": "11657465", "branch": "경기지사", "dealer": "평택대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 195000.0, "amount": 4.1, "types": {"misclass": false, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) L-B200-030-203 감압수류 S/W ASS'Y\n  - 대성 제품 -> 롯데 부품 사용\n  2) 발생 차액 +4.1"}, {"month": "26.06", "counselNo": "11658404", "branch": "전주지사", "dealer": "전주동부대리점", "center": "호남센터", "consultant": "김두석", "paid": "유상", "repairCost": 1046000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2130569S 연소실 세트(DRS, 48S, STS연도용(Ø75), A/S)_중복 계리\n  - 제조번호 기준 관리를 위해 동일 현장 2대 이상 제품 수리의 경우 현장 접수 후 별도 처리 요망"}, {"month": "26.06", "counselNo": "11652793", "branch": "경남지사", "dealer": "통영대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 136000.0, "amount": 1.1, "types": {"misclass": false, "false": true, "image": false}, "content": "* 최근 3년간(24.06~26.06) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.06", "counselNo": "11658245", "branch": "서울북부지사", "dealer": "가평대리점", "center": "수도권센터", "consultant": "주성택", "paid": "유상", "repairCost": 150000.0, "amount": 4.9, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 3300095S 히터 세트 (1300W+700W, RZB30/50, A/S) \n  2) 발생 차액 +4.9"}, {"month": "26.06", "counselNo": "11642338", "branch": "전주지사", "dealer": "북남원대리점", "center": "호남센터", "consultant": "김인호", "paid": "유상", "repairCost": 196000.0, "amount": 2.1, "types": {"misclass": true, "false": false, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 3300006S 안전밸브 (Ferroli SG / OS, A/S)_중복 계리\n  - 제조번호 기준 관리를 위해 동일 현장 2대 이상 제품 수리의 경우 현장 접수 후 별도 처리 요망\n  2) 발생 차액 +2.1"}, {"month": "26.06", "counselNo": "11658732", "branch": "전주지사", "dealer": "고창중앙대리점", "center": "호남센터", "consultant": "김두석", "paid": "유상", "repairCost": 144000.0, "amount": 1.3, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 3130559S 난방온도센서 (클립 타입, A/S)\n  - 롯데 제품 -> 대성 부품 사용\n  2) 발생 차액 +1.3"}, {"month": "26.07", "counselNo": "11677866", "branch": "서울북부지사", "dealer": "구리제일대리점", "center": "수도권센터", "consultant": "이동혁", "paid": "유상", "repairCost": 149000.0, "amount": 3.8, "types": {"misclass": true, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1)2020308S 화염감지기 세트 (SPA GOLD, A/S), 2080302S 자동점화기＋연결선 (SPA GOLD) \n  - 롯데 제품 -> 대성 부품 사용\n  2) 발생 차액 +3.8"}, {"month": "26.07", "counselNo": "11675375", "branch": "전주지사", "dealer": "남원대리점", "center": "호남센터", "consultant": "김두석", "paid": "유상", "repairCost": 74000.0, "amount": 1.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020423S 스파크플러그 세트 (DNC, DEC, 1332, A/S) _중복 계리\n  2) 발생 차액 +1.7"}, {"month": "26.07", "counselNo": "11689328", "branch": "전주지사", "dealer": "(신)서전주대리점", "center": "호남센터", "consultant": "김인호", "paid": "유상", "repairCost": 68000.0, "amount": 0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 오계리 발생건\n  1) 2086130S 자동점화기 (DSG-220N, 콘덴싱, 내수용, 220V, A/S) ->\n 2080364S 자동점화기 세트 (SSP N, 2530, DSC, 1335, A/S)로 계리요망.\n  - 호환불가 부품지속 계리 해당 건 외 7건"}, {"month": "26.07", "counselNo": "11668161", "branch": "경기지사", "dealer": "용인중앙대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 265000.0, "amount": 1.8, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060245S SWHW 블럭 세트 (ES, 1620, 출탕온도센서, A/S)_총 3개 계리\n  2) 발생 차액 +1.8"}, {"month": "26.07", "counselNo": "11666017", "branch": "경남지사", "dealer": "통영대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 198000.0, "amount": 1.1, "types": {"misclass": true, "false": false, "image": false}, "content": "* 최근 3년간(23.07~26.07) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3135001S 펌프리드선_ 오계리 추가 청구\n  - 3130863S 펌프중간연결선 (A/S용) 계리 요망\n  2) 추가 청구 차액(기술료 포함) +1.1"}, {"month": "26.07", "counselNo": "11669063", "branch": "경기지사", "dealer": "평택대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 437000.0, "amount": 11.3, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2080687S PCB일체(SSPⅡ 10~16k, 출탕, 각방, 자동)_중복계리\n  2) 발생 차액 +11.3"}, {"month": "26.07", "counselNo": "11695083", "branch": "경기지사", "dealer": "오산대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 203000.0, "amount": 2.9, "types": {"misclass": false, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 3300058S 전원코드(Ferroli SG)_전기온수기 부품 사용\n  2) 발생 차액 +2.9"}, {"month": "26.07", "counselNo": "11677978", "branch": "경기지사", "dealer": "용인기흥대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 212000.0, "amount": 1.5, "types": {"misclass": false, "false": true, "image": false}, "content": "* 최근 3년간(23.07~26.07) 주문이력 없는 부품 계리, 차액 발생건\n  1) 3120030S 펌프 고정핀\n  2) 추가 청구 차액(기술료 포함) +1.5"}, {"month": "26.07", "counselNo": "11676262", "branch": "서울남부지사", "dealer": "동작대리점", "center": "수도권센터", "consultant": "김진만", "paid": "유상", "repairCost": 199000.0, "amount": 3.2, "types": {"misclass": true, "false": false, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060290S 유수감지기 세트 (SSP, 1016, A/S)_ 총 3개 계리. \n  - 여러세대 수리의 경우 현장접수로 각각의 제조번호 입력 처리 요망\n  2) 발생 차액 +3.2"}, {"month": "26.07", "counselNo": "11685554", "branch": "대구지사", "dealer": "포항남구대리점", "center": "영남센터", "consultant": "임대호", "paid": "유상", "repairCost": 78000.0, "amount": 2.0, "types": {"misclass": true, "false": false, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060229AS 유수감지기 세트 (A/S)_중복 계리\n  2) 발생 차액 +2.0"}, {"month": "26.07", "counselNo": "11689405", "branch": "경남지사", "dealer": "통영대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 194000.0, "amount": 2.1, "types": {"misclass": false, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 3165018S 오일 필터(고무호스 타입) \n  - 가스 제품 -> 기름 부품 사용\n  2) 발생 차액 +2.1"}, {"month": "26.07", "counselNo": "11664336", "branch": "서울북부지사", "dealer": "구리제일대리점", "center": "수도권센터", "consultant": "이동혁", "paid": "유상", "repairCost": 75000.0, "amount": 1.0, "types": {"misclass": false, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) L-B900-120-310 난방환수 PIPE ASS'Y(개방)\n  - 대성 제품 -> 롯데 부품 사용\n  2) 발생 차액 +1.0"}, {"month": "26.07", "counselNo": "11691822", "branch": "서울북부지사", "dealer": "서울강북대리점", "center": "수도권센터", "consultant": "이동혁", "paid": "유상", "repairCost": 380000.0, "amount": 1.6, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060290S 유수감지기 세트 (SSP, 1016, A/S)_중복 계리. \n  2) 발생 차액 +1.6"}, {"month": "26.07", "counselNo": "11675227", "branch": "경기지사", "dealer": "평택대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 318000.0, "amount": 4.1, "types": {"misclass": false, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) L-B200-030-203 감압수류 S/W ASS'Y\n  - 대성 제품 -> 롯데 부품 사용\n  2) 발생 차액 +4.1"}, {"month": "26.07", "counselNo": "11679300", "branch": "경남지사", "dealer": "통영대리점", "center": "영남센터", "consultant": "이형원", "paid": "유상", "repairCost": 125000.0, "amount": 2.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 3075027S 직수꼭지 (DSW,A/S)\n  - 전기온수기 제품 -> 가스온수기 부품 사용\n  2) 발생 차액 +2.7"}, {"month": "26.08", "counselNo": "11712797", "branch": "서울남부지사", "dealer": "금천대리점", "center": "수도권센터", "consultant": "김진만", "paid": "유상", "repairCost": 73000.0, "amount": 1.1, "types": {"misclass": true, "false": false, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2020424S 화염감지기 세트 (DNC, DEC, 1332, A/S)_중복 계리\n  - 스파크 플러그 오계리 정황\n  2) 발생 차액 +1.1"}, {"month": "26.08", "counselNo": "11698047", "branch": "경기지사", "dealer": "안성중앙대리점", "center": "수도권센터", "consultant": "이민철", "paid": "유상", "repairCost": 84000.0, "amount": 1.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2081152S 자동점화기(DNC,K-TYPE,220V, A/S)_중복 계리\n  2) 발생 차액 +1.2"}, {"month": "26.08", "counselNo": "11707074", "branch": "광주지사", "dealer": "여수중앙대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 397000.0, "amount": 3.9, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2040128AS 차압식 물보충 밸브 일체 (SSP, DNC, DSC, 1635, A/S)_중복 계리\n  2) 발생 차액 +3.9"}, {"month": "26.08", "counselNo": "11700460", "branch": "원주지사", "dealer": "태백중앙대리점", "center": "중부센터", "consultant": "유범후", "paid": "유상", "repairCost": 56000.0, "amount": 0.4, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 2040120S 유량감지기일체(SWF-30)_가스온수기 부품 사용\n  - 2060229AS 사용 후 오계리 정황\n  2) 발생 차액 +0.4"}, {"month": "26.08", "counselNo": "11703905", "branch": "서울북부지사", "dealer": "구리제일대리점", "center": "수도권센터", "consultant": "이동혁", "paid": "유상", "repairCost": 154000.0, "amount": 2.0, "types": {"misclass": false, "false": true, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 3060258S 난방 환수관 세트 (DSH, 백업링, A/S)_호환 불가 부품 사용\n  - 최근 3년간(23.08~26.08) 주문 이력 없음\n  2) 발생 차액 +2.0"}, {"month": "26.08", "counselNo": "11716014", "branch": "서울남부지사", "dealer": "관악대리점", "center": "수도권센터", "consultant": "김진만", "paid": "유상", "repairCost": 278000.0, "amount": 3.7, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2060321S Air Vent + 펌프 BK 일체(SSP 소용량, CD)_중복계리\n  2) 발생 차액 +3.7"}, {"month": "26.08", "counselNo": "11706707", "branch": "광주지사", "dealer": "광주북구중앙대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 56000.0, "amount": 1.2, "types": {"misclass": true, "false": true, "image": false}, "content": "* 미사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 2130548S 연소실 일체+호스 세트 (SSP, 1316, OD, NG, 표면센서, A/S)\n  - 부품 미사용건 동일 부품 중복입력으로 기술료 부정 발생\n  2) 발생 차액 +1.2"}, {"month": "26.08", "counselNo": "11701783", "branch": "대구지사", "dealer": "성주대리점", "center": "영남센터", "consultant": "남주현", "paid": "유상", "repairCost": 260000.0, "amount": 3.6, "types": {"misclass": false, "false": true, "image": false}, "content": "* 사용 부품 중복 계리로 인한 추가 차액 발생 건\n  1) 3130393S PCB 연결선 (HW, 1324)_중복 계리\n  2) 발생 차액 +3.6"}, {"month": "26.08", "counselNo": "11696540", "branch": "광주지사", "dealer": "서귀포대리점", "center": "호남센터", "consultant": "박은철", "paid": "유상", "repairCost": 35000.0, "amount": 1.5, "types": {"misclass": true, "false": false, "image": false}, "content": "* 호환불가 부품 계리로 인한 부정서비스 발생 건\n  1) 3080159S 가스밸브패킹 (UP-34, 좌측, A/S)_호환 불가 부품 사용\n  2) 발생 차액 +1.5"}];
+
+const TYPE_META = {
+  misclass: {label:"오계리", short:"오", color:"#2C5A82"},
+  false:    {label:"허위/과다청구", short:"허", color:"#C0392B"},
+  image:    {label:"이미지첨부오류", short:"이", color:"#B67B1E"},
+};
+const BRANCH_PALETTE = ['#16305A','#E08A3C','#2C5A82','#C0392B','#5B8C5A','#8E5FA8','#B67B1E','#4A7A9D','#A0522D','#5C6BC0','#7A8B99'];
+let BRANCH_COLOR = {};
+
+let state = { branch:"all", months:new Set(), type:"all", dealer:"all", search:"" };
+
+const months = [...new Set(RAW.map(r=>r.month))].sort();
+const branches = [...new Set(RAW.map(r=>r.branch))].sort();
+branches.forEach((b,i)=>{ BRANCH_COLOR[b] = BRANCH_PALETTE[i % BRANCH_PALETTE.length]; });
+state.months = new Set(months); // default: all months selected
+
+document.getElementById('periodNote').textContent =
+  `부정/부실 서비스 발생 현황 종합 (${months[0]}~${months[months.length-1]})`;
+
+// ---- pill filters ----
+function buildPills(containerId, items, isActive, onClick){
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  items.forEach(item=>{
+    const btn = document.createElement('button');
+    btn.className = 'pill-btn' + (isActive(item) ? ' active' : '');
+    btn.textContent = item.label;
+    btn.addEventListener('click', ()=>onClick(item, btn));
+    el.appendChild(btn);
+  });
+}
+
+function populateBranchSelect(){
+  const fBranch = document.getElementById('fBranch');
+  fBranch.innerHTML = '<option value="all">전체 지사</option>';
+  branches.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=b; fBranch.appendChild(o); });
+}
+
+function refreshMonthPills(){
+  const items = [{label:'전체기간', value:'__all__'}, ...months.map(m=>({label:m, value:m}))];
+  buildPills('monthPills', items, it=>{
+    if(it.value==='__all__') return state.months.size===months.length;
+    return state.months.has(it.value);
+  }, (it, btn)=>{
+    if(it.value==='__all__'){
+      state.months = new Set(months);
+    } else {
+      state.months = new Set([it.value]);
+    }
+    document.querySelectorAll('#monthPills .pill-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAll();
+  });
+}
+
+function refreshTypePills(){
+  const items = [{label:'전체', value:'all'}, ...Object.entries(TYPE_META).map(([k,v])=>({label:v.label, value:k}))];
+  buildPills('typePills', items, it=>state.type===it.value, (it, btn)=>{
+    state.type = it.value;
+    document.querySelectorAll('#typePills .pill-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAll();
+  });
+}
+
+function updateDealerOptions(){
+  const fDealer = document.getElementById('fDealer');
+  fDealer.innerHTML = '<option value="all">전체 대리점</option>';
+  const pool = state.branch==="all" ? RAW : RAW.filter(r=>r.branch===state.branch);
+  const dealers = [...new Set(pool.map(r=>r.dealer))].sort();
+  dealers.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; fDealer.appendChild(o); });
+}
+
+refreshMonthPills();
+refreshTypePills();
+populateBranchSelect();
+updateDealerOptions();
+
+document.getElementById('fBranch').addEventListener('change', e=>{
+  state.branch = e.target.value;
+  state.dealer = 'all';
+  updateDealerOptions();
+  renderAll();
+});
+document.getElementById('fDealer').addEventListener('change', e=>{ state.dealer = e.target.value; renderAll(); });
+document.getElementById('fSearch').addEventListener('input', e=>{ state.search = e.target.value.trim(); renderAll(); });
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+function getFiltered(){
+  return RAW.filter(r=>{
+    if(state.branch!=="all" && r.branch!==state.branch) return false;
+    if(!state.months.has(r.month)) return false;
+    if(state.dealer!=="all" && r.dealer!==state.dealer) return false;
+    if(state.type!=="all" && !r.types[state.type]) return false;
+    if(state.search){
+      const q = state.search.toLowerCase();
+      if(!r.counselNo.includes(q) && !r.dealer.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function fmtWon(manwon){
+  const won = Math.round((manwon||0)*10000);
+  return won.toLocaleString('ko-KR')+'원';
+}
+
+let trendChart, amountChart;
+
+// data label plugin: draws value above each point on line charts
+const pointLabelPlugin = {
+  id: 'pointLabelPlugin',
+  afterDatasetsDraw(chart){
+    const {ctx} = chart;
+    chart.data.datasets.forEach((ds, dsIdx)=>{
+      const meta = chart.getDatasetMeta(dsIdx);
+      if(meta.type !== 'line') return;
+      ctx.save();
+      ctx.font = '600 11px Pretendard, sans-serif';
+      ctx.fillStyle = ds.borderColor;
+      ctx.textAlign = 'center';
+      meta.data.forEach((point, i)=>{
+        const val = ds.data[i];
+        if(val===undefined || val===null) return;
+        ctx.fillText(val, point.x, point.y - 10);
+      });
+      ctx.restore();
+    });
+  }
+};
+
+// data label plugin: draws formatted 원 value above each bar
+const barLabelPlugin = {
+  id: 'barLabelPlugin',
+  afterDatasetsDraw(chart){
+    const {ctx} = chart;
+    chart.data.datasets.forEach((ds, dsIdx)=>{
+      const meta = chart.getDatasetMeta(dsIdx);
+      if(meta.type !== 'bar') return;
+      ctx.save();
+      ctx.font = '600 10.5px Pretendard, sans-serif';
+      ctx.fillStyle = '#475467';
+      ctx.textAlign = 'center';
+      meta.data.forEach((bar, i)=>{
+        const val = ds.data[i];
+        if(val===undefined || val===null) return;
+        ctx.fillText(val.toLocaleString('ko-KR')+'원', bar.x, bar.y - 6);
+      });
+      ctx.restore();
+    });
+  }
+};
+
+function renderAll(){
+  const data = getFiltered();
+  renderKpi(data);
+  renderTrendChart(data);
+  renderTypeList(data, 'typeList');
+  renderTypeList(data, 'typeListBig');
+  renderAmountChart(data);
+  renderBranchBars(data);
+  renderRankTab(data);
+  renderCombo(data);
+  renderDetail(data);
+}
+
+function renderKpi(data){
+  document.getElementById('kpiCount').innerHTML = data.length.toLocaleString()+'<span class="unit">건</span>';
+  const totalAmt = data.reduce((s,r)=>s+r.amount,0);
+  document.getElementById('kpiAmount').textContent = fmtWon(totalAmt);
+  const avg = data.length? totalAmt/data.length : 0;
+  document.getElementById('kpiAvg').textContent = fmtWon(avg);
+
+  const byDealer = {};
+  data.forEach(r=>{ byDealer[r.dealer]=(byDealer[r.dealer]||0)+1; });
+  const top = Object.entries(byDealer).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('kpiTopDealer').textContent = top? top[0] : '-';
+  document.getElementById('kpiTopDealerSub').textContent = top? `${top[1]}건 발생` : '';
+
+  document.getElementById('kpiCountSub').textContent = `선택 ${state.months.size}개월 기준`;
+  document.getElementById('kpiAmountSub').textContent = `건당 평균 ${fmtWon(avg)}`;
+}
+
+function renderTrendChart(data){
+  const selectedMonths = months.filter(m=>state.months.has(m));
+  const byMonth = {};
+  selectedMonths.forEach(m=>byMonth[m]=0);
+  data.forEach(r=>{ if(byMonth[r.month]!==undefined) byMonth[r.month]++; });
+
+  const ctx = document.getElementById('trendChart');
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels:selectedMonths,
+      datasets:[{
+        label: state.branch==='all' ? '전체' : state.branch,
+        data:selectedMonths.map(m=>byMonth[m]),
+        borderColor:'#16305A', backgroundColor:'#16305A',
+        tension:0.3, pointRadius:3, borderWidth:2.5
+      }]
+    },
+    options:{
+      responsive:true,
+      layout:{padding:{top:18}},
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{ticks:{color:'#667085'}, grid:{color:'#F0F1F4'}, title:{display:true, text:'건수', font:{size:11}, color:'#667085'}},
+        x:{ticks:{color:'#667085'}, grid:{display:false}}
+      }
+    },
+    plugins:[pointLabelPlugin]
+  });
+}
+
+function renderAmountChart(data){
+  const selectedMonths = months.filter(m=>state.months.has(m));
+  const byMonth = {};
+  selectedMonths.forEach(m=>byMonth[m]=0);
+  data.forEach(r=>{ if(byMonth[r.month]!==undefined) byMonth[r.month]+=r.amount; });
+
+  const ctx = document.getElementById('amountChart');
+  if(amountChart) amountChart.destroy();
+  amountChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels:selectedMonths,
+      datasets:[{
+        label: state.branch==='all' ? '전체' : state.branch,
+        data:selectedMonths.map(m=>Math.round(byMonth[m]*10000)),
+        backgroundColor:'#C0392B',
+        borderRadius:4, maxBarThickness:32
+      }]
+    },
+    options:{
+      responsive:true,
+      layout:{padding:{top:22}},
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{ticks:{color:'#667085', callback:v=>v.toLocaleString('ko-KR')}, grid:{color:'#F0F1F4'}, title:{display:true, text:'원', font:{size:11}, color:'#667085'}},
+        x:{ticks:{color:'#667085'}, grid:{display:false}}
+      }
+    },
+    plugins:[barLabelPlugin]
+  });
+}
+
+function renderBranchBars(data){
+  const byBranch = {};
+  branches.forEach(b=>byBranch[b]=0);
+  data.forEach(r=>{ if(byBranch[r.branch]!==undefined) byBranch[r.branch]++; });
+  const sorted = Object.entries(byBranch).sort((a,b)=>b[1]-a[1]);
+  const max = Math.max(1, ...sorted.map(s=>s[1]));
+  const container = document.getElementById('branchBars');
+  container.innerHTML='';
+  sorted.forEach(([b,c])=>{
+    const row = document.createElement('div');
+    row.className='branch-row';
+    row.innerHTML = `<div class="branch-label">${b}</div>
+      <div class="branch-track"><div class="branch-fill" style="width:${(c/max*100)}%;background:${BRANCH_COLOR[b]}"></div></div>
+      <div class="branch-val">${c}건</div>`;
+    container.appendChild(row);
+  });
+}
+
+function renderTypeList(data, containerId){
+  const counts = {};
+  Object.keys(TYPE_META).forEach(k=>counts[k]=0);
+  data.forEach(r=>{ Object.keys(TYPE_META).forEach(k=>{ if(r.types[k]) counts[k]++; }); });
+  const max = Math.max(1, ...Object.values(counts));
+  const total = data.length || 1;
+
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  container.innerHTML = '';
+  Object.entries(counts).forEach(([k,c])=>{
+    const meta = TYPE_META[k];
+    const pct = Math.round(c/total*100);
+    const row = document.createElement('div');
+    row.className = 'type-row';
+    row.innerHTML = `
+      <div class="type-circle" style="background:${meta.color}">${meta.short}</div>
+      <div class="type-name">${meta.label}</div>
+      <div class="type-track"><div class="type-fill" style="width:${(c/max*100)}%;background:${meta.color}"></div></div>
+      <div class="type-count">${c}건 (${pct}%)</div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function renderRankTab(data){
+  if(state.branch === 'all'){
+    document.getElementById('rankBranchPanel').style.display='';
+    document.getElementById('rankDealerPanel').style.display='none';
+    renderBranchSummary(data);
+  } else {
+    document.getElementById('rankBranchPanel').style.display='none';
+    document.getElementById('rankDealerPanel').style.display='';
+    document.getElementById('rankDealerTitle').textContent = state.branch + ' · 대리점별 랭킹';
+    renderDealerRank(data);
+  }
+}
+
+function goToBranch(branchName){
+  document.getElementById('fBranch').value = branchName;
+  state.branch = branchName;
+  state.dealer = 'all';
+  updateDealerOptions();
+  renderAll();
+}
+
+let branchSort = {key:'count', dir:'desc'};
+
+function renderBranchSummary(data){
+  const byBranch = {};
+  data.forEach(r=>{
+    if(!byBranch[r.branch]) byBranch[r.branch]={dealers:new Set(), count:0, amount:0};
+    byBranch[r.branch].dealers.add(r.dealer);
+    byBranch[r.branch].count++;
+    byBranch[r.branch].amount+=r.amount;
+  });
+  let rows = Object.entries(byBranch).map(([branch, v])=>({
+    branch, dealers:v.dealers.size, count:v.count, amount:v.amount, avg:v.count? v.amount/v.count : 0
+  }));
+
+  const {key, dir} = branchSort;
+  rows.sort((a,b)=>{
+    let cmp;
+    if(key==='branch') cmp = a.branch.localeCompare(b.branch, 'ko');
+    else cmp = a[key]-b[key];
+    return dir==='asc' ? cmp : -cmp;
+  });
+
+  // update header arrow indicators
+  document.querySelectorAll('#rankBranchPanel th.sortable').forEach(th=>{
+    const arrow = th.querySelector('.sort-arrow');
+    if(th.dataset.key===key){
+      th.classList.add('sort-active');
+      arrow.textContent = dir==='asc' ? '▲' : '▼';
+    } else {
+      th.classList.remove('sort-active');
+      arrow.textContent = '';
+    }
+  });
+
+  const tbody = document.getElementById('branchRankBody');
+  tbody.innerHTML='';
+  rows.forEach((v, idx)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${idx+1}</td>
+      <td><a class="drill-link" data-branch="${v.branch}">${v.branch}</a></td>
+      <td class="num">${v.dealers}개</td>
+      <td class="num">${v.count}건</td>
+      <td class="num">${fmtWon(v.amount)}</td>
+      <td class="num">${fmtWon(v.avg)}</td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.drill-link').forEach(a=>{
+    a.addEventListener('click', ()=>goToBranch(a.dataset.branch));
+  });
+  if(rows.length===0) tbody.innerHTML = '<tr><td colspan="6" class="empty-note">데이터가 없습니다.</td></tr>';
+}
+
+document.getElementById('rankBackLink').addEventListener('click', ()=>goToBranch('all'));
+
+document.getElementById('detailBackLink').addEventListener('click', ()=>{
+  document.getElementById('fBranch').value = 'all';
+  state.branch = 'all';
+  state.dealer = 'all';
+  updateDealerOptions();
+  renderAll();
+});
+
+document.querySelectorAll('#rankBranchPanel th.sortable').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    if(branchSort.key === key){
+      branchSort.dir = branchSort.dir==='asc' ? 'desc' : 'asc';
+    } else {
+      branchSort.key = key;
+      branchSort.dir = key==='branch' ? 'asc' : 'desc';
+    }
+    renderAll();
+  });
+});
+
+function renderDealerRank(data){
+  const byDealer = {};
+  data.forEach(r=>{
+    if(!byDealer[r.dealer]) byDealer[r.dealer]={branch:r.branch, count:0, amount:0};
+    byDealer[r.dealer].count++;
+    byDealer[r.dealer].amount+=r.amount;
+  });
+  const rows = Object.entries(byDealer).sort((a,b)=>b[1].count-a[1].count);
+  const tbody = document.getElementById('dealerRankBody');
+  tbody.innerHTML='';
+  rows.forEach(([dealer, v], idx)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${idx+1}</td>
+      <td><a class="drill-link" data-dealer="${dealer}">${dealer}</a></td>
+      <td class="num">${v.count}건</td>
+      <td class="num">${fmtWon(v.amount)}</td>
+      <td class="num">${fmtWon(v.amount/v.count)}</td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.drill-link').forEach(a=>{
+    a.addEventListener('click', ()=>{
+      document.getElementById('fDealer').value = a.dataset.dealer;
+      state.dealer = a.dataset.dealer;
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      document.querySelector('.tab-btn[data-tab="detail"]').classList.add('active');
+      document.getElementById('tab-detail').classList.add('active');
+      renderAll();
+    });
+  });
+  if(rows.length===0) tbody.innerHTML = '<tr><td colspan="5" class="empty-note">데이터가 없습니다.</td></tr>';
+}
+
+function renderCombo(data){
+  const comboCounts = {};
+  data.forEach(r=>{
+    const active = Object.keys(TYPE_META).filter(k=>r.types[k]);
+    const key = active.map(k=>TYPE_META[k].label).join(' + ') || '미분류';
+    comboCounts[key]=(comboCounts[key]||0)+1;
+  });
+  const rows = Object.entries(comboCounts).sort((a,b)=>b[1]-a[1]);
+  const max = Math.max(1, ...rows.map(r=>r[1]));
+  const container = document.getElementById('comboList');
+  container.innerHTML='';
+  rows.forEach(([label,c])=>{
+    const row = document.createElement('div');
+    row.className='type-row';
+    row.innerHTML = `<div class="type-name" style="width:190px;">${label}</div>
+      <div class="type-track"><div class="type-fill" style="width:${(c/max*100)}%;background:#667085"></div></div>
+      <div class="type-count">${c}건</div>`;
+    container.appendChild(row);
+  });
+}
+
+function renderDetail(data){
+  const backLink = document.getElementById('detailBackLink');
+  backLink.style.display = (state.branch!=='all' || state.dealer!=='all') ? 'inline-block' : 'none';
+
+  const tbody = document.getElementById('detailBody');
+  tbody.innerHTML='';
+  document.getElementById('detailCount').textContent = `총 ${data.length}건`;
+  const sorted = [...data].sort((a,b)=> b.month.localeCompare(a.month) || Number(b.counselNo)-Number(a.counselNo));
+  sorted.slice(0,300).forEach(r=>{
+    const badges = Object.keys(TYPE_META).filter(k=>r.types[k])
+      .map(k=>`<span class="badge ${k}">${TYPE_META[k].label}</span>`).join(' ');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.month}</td><td>${r.counselNo}</td><td>${r.branch}</td><td>${r.dealer}</td>
+      <td><span class="badge paid">${r.paid}</span></td>
+      <td class="num">${fmtWon(r.amount)}</td>
+      <td>${badges}</td>
+      <td class="content-snippet" title="${r.content}">${r.content}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('detailEmpty').style.display = data.length? 'none':'block';
+}
+
+renderAll();
+</script>
+</body>
+</html>
