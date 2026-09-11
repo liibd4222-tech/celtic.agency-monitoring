@@ -803,12 +803,21 @@ document.getElementById('rankCenterBackLink').addEventListener('click', ()=>goTo
 document.getElementById('rankBackLink').addEventListener('click', ()=>goBackFromDealer());
 
 document.getElementById('detailBackLink').addEventListener('click', ()=>{
-  document.getElementById('fBranch').value = 'all';
-  state.branch = 'all';
-  state.dealer = 'all';
-  rankCenterFilter = null;
-  updateDealerOptions();
-  renderAll();
+  if(state.branch !== 'all'){
+    // came from a drill-down (센터→지사→대리점) — go back to that 지사's 대리점 목록
+    state.dealer = 'all';
+    document.getElementById('fDealer').value = 'all';
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.querySelector('.tab-btn[data-tab="rank"]').classList.add('active');
+    document.getElementById('tab-rank').classList.add('active');
+    renderAll();
+  } else {
+    // dealer was picked directly (no branch context) — just clear the dealer filter
+    state.dealer = 'all';
+    document.getElementById('fDealer').value = 'all';
+    renderAll();
+  }
 });
 
 document.querySelectorAll('#rankCenterPanel th.sortable').forEach(th=>{
@@ -894,6 +903,7 @@ function renderCombo(data){
 function renderDetail(data){
   const backLink = document.getElementById('detailBackLink');
   backLink.style.display = (state.branch!=='all' || state.dealer!=='all') ? 'inline-block' : 'none';
+  backLink.textContent = state.branch!=='all' ? `← ${state.branch} 대리점 목록` : '← 전체 보기 (지사·대리점 전체)';
 
   const tbody = document.getElementById('detailBody');
   tbody.innerHTML='';
